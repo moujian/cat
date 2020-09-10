@@ -4,19 +4,17 @@
 <%@ taglib prefix="res" uri="http://www.unidal.org/webres"%>
 <%@ taglib prefix="w" uri="http://www.unidal.org/web/core"%>
 
-<a:config>
+<a:mobile>
 	<res:useJs value="${res.js.local['jquery.validate.min.js']}" target="head-js" />
-	<res:useJs value="${res.js.local['dependencyConfig.js']}" target="head-js" />
-	<res:useJs value="${res.js.local['alarm_js']}" target="head-js" />
-	<res:useCss value="${res.css.local['select2.css']}" target="head-css" />
-	<res:useJs value="${res.js.local['select2.min.js']}" target="head-js" />
-
+	<res:useJs value="${res.js.local['editor.js']}" target="head-js" />
+	<script src='${model.webapp}/assets/js/editor/ace.js'></script>
 			<form name="appConfigUpdate" id="form" method="post"
 				action="${model.pageUri}?op=appConfigUpdate">
 				<table class="table table-striped table-condensed   table-hover">
-					<tr>
-						<td><textarea name="content" style="width:auto" rows="20" cols="150">${model.content}</textarea></td>
-					</tr>
+					<tr><td>
+						<input id="content" name="content" value="" type="hidden"/>
+						<div id="editor" class="editor">${model.content}</div>
+					</td></tr>
 					<tr>
 						<td style="text-align:center"><input class='btn btn-primary' 
 							type="submit" name="submit" value="提交" /></td>
@@ -26,7 +24,7 @@
 							<h4 class="text-center text-danger">手机端配置（请增加COMMAND节点，ID增加，不要删除其他节点）</h4>
 							<h4 class="text-center text-danger" id="state">&nbsp;</h4>
 			
-</a:config>
+</a:mobile>
 <script type="text/javascript">
 		$(document).ready(function() {
 			$('#userMonitor_config').addClass('active open');

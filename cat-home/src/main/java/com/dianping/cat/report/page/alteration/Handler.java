@@ -1,5 +1,24 @@
+/*
+ * Copyright (c) 2011-2018, Meituan Dianping. All Rights Reserved.
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.dianping.cat.report.page.alteration;
 
+import javax.servlet.ServletException;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
@@ -14,8 +33,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import javax.servlet.ServletException;
-
+import org.unidal.dal.jdbc.DalNotFoundException;
 import org.unidal.lookup.annotation.Inject;
 import org.unidal.lookup.util.StringUtils;
 import org.unidal.web.mvc.PageHandler;
@@ -24,17 +42,23 @@ import org.unidal.web.mvc.annotation.OutboundActionMeta;
 import org.unidal.web.mvc.annotation.PayloadMeta;
 
 import com.dianping.cat.Cat;
+import com.dianping.cat.consumer.storage.builder.StorageSQLBuilder;
 import com.dianping.cat.home.dal.report.Alteration;
 import com.dianping.cat.home.dal.report.AlterationDao;
 import com.dianping.cat.home.dal.report.AlterationEntity;
 import com.dianping.cat.report.ReportPage;
 
 public class Handler implements PageHandler<Context> {
+
+	private final static String EMPTY = "N/A";
+
 	@Inject
 	private JspViewer m_jspViewer;
 
 	@Inject
 	private AlterationDao m_alterationDao;
+
+	private SimpleDateFormat m_sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
 	private Alteration buildAlteration(Payload payload) {
 		String type = payload.getType();
@@ -46,6 +70,7 @@ public class Handler implements PageHandler<Context> {
 		String group = payload.getGroup();
 		String content = payload.getContent();
 		String url = payload.getUrl();
+		int status = payload.getStatus();
 
 		Date date = payload.getAlterationDate();
 		Alteration alt = new Alteration();
@@ -59,6 +84,7 @@ public class Handler implements PageHandler<Context> {
 		alt.setContent(content);
 		alt.setHostname(hostname);
 		alt.setDate(date);
+		alt.setStatus(status);
 		try {
 			alt.setUrl(URLDecoder.decode(url, "UTF-8"));
 		} catch (UnsupportedEncodingException e) {
@@ -105,7 +131,7 @@ public class Handler implements PageHandler<Context> {
 
 		switch (action) {
 		case INSERT:
-			if (!isArguComplete(payload)) {
+			if (isIllegalArgs(payload)) {
 				setInsertResult(model, 2);
 			} else {
 				Alteration alt = buildAlteration(payload);
@@ -125,7 +151,7 @@ public class Handler implements PageHandler<Context> {
 			}
 			break;
 		case VIEW:
-			List<Alteration> alts;
+			List<Alteration> alts = new ArrayList<Alteration>();
 			Date startTime = payload.getStartTime();
 			Date endTime = payload.getEndTime();
 			String[] altTypes = payload.getAltTypeArray();
@@ -135,15 +161,15 @@ public class Handler implements PageHandler<Context> {
 
 			try {
 				if (altTypes == null) {
-					alts = m_alterationDao.findByDtdh(startTime, endTime, type, domain, hostname,
-					      AlterationEntity.READSET_FULL);
+					alts = m_alterationDao.findByDtdh(startTime, endTime, type, domain, hostname,	AlterationEntity.READSET_FULL);
 				} else {
-					alts = m_alterationDao.findByDtdhTypes(startTime, endTime, type, domain, hostname, altTypes,
-					      AlterationEntity.READSET_FULL);
+					alts = m_alterationDao
+											.findByDtdhTypes(startTime, endTime, type, domain, hostname, altTypes,	AlterationEntity.READSET_FULL);
 				}
+			} catch (DalNotFoundException e) {
+				// ignore it
 			} catch (Exception e) {
 				Cat.logError(e);
-				break;
 			}
 			model.setAlterationMinuites(generateAlterationMinutes(alts));
 			break;
@@ -157,24 +183,71 @@ public class Handler implements PageHandler<Context> {
 		}
 	}
 
-	public boolean isArguComplete(Payload payload) {
+	public boolean isIllegalArgs(Payload payload) {
 		if (StringUtils.isEmpty(payload.getType())) {
-			return false;
+			return true;
+		} else if (StorageSQLBuilder.ID.equals(payload.getType())) {
+			boolean ret = normalizeArgs(payload);
+
+			if (!ret) {
+				return true;
+			}
+		} else {
+			if (StringUtils.isEmpty(payload.getTitle())) {
+				return true;
+			}
+			if (StringUtils.isEmpty(payload.getDomain())) {
+				return true;
+			}
+			if (StringUtils.isEmpty(payload.getHostname())) {
+				return true;
+			}
+			if (payload.getAlterationDate() == null) {
+				return true;
+			}
+			if (StringUtils.isEmpty(payload.getUser())) {
+				return true;
+			}
+			if (StringUtils.isEmpty(payload.getContent())) {
+				return true;
+			}
+			if ("puppet".equals(payload.getType())) {
+				return true;
+			}
+
 		}
+		return false;
+	}
+
+	private boolean normalizeArgs(Payload payload) {
 		if (StringUtils.isEmpty(payload.getTitle())) {
 			return false;
 		}
-		if (StringUtils.isEmpty(payload.getDomain())) {
+		boolean domainEmpty = StringUtils.isEmpty(payload.getDomain());
+		boolean hostEmpty = StringUtils.isEmpty(payload.getHostname());
+		boolean ipEmpty = StringUtils.isEmpty(payload.getIp());
+
+		if (ipEmpty && domainEmpty && hostEmpty) {
 			return false;
-		}
-		if (StringUtils.isEmpty(payload.getHostname())) {
-			return false;
+		} else {
+			if (domainEmpty) {
+				payload.setDomain(EMPTY);
+			}
+			if (hostEmpty) {
+				payload.setHostname(EMPTY);
+			}
+			if (ipEmpty) {
+				payload.setIp(EMPTY);
+			}
 		}
 		if (payload.getAlterationDate() == null) {
-			return false;
+			payload.setAlterationDate(m_sdf.format(new Date()));
 		}
 		if (StringUtils.isEmpty(payload.getUser())) {
-			return false;
+			payload.setUrl(EMPTY);
+		}
+		if (StringUtils.isEmpty(payload.getUrl())) {
+			payload.setUrl(EMPTY);
 		}
 		if (StringUtils.isEmpty(payload.getContent())) {
 			return false;
@@ -183,11 +256,11 @@ public class Handler implements PageHandler<Context> {
 	}
 
 	/**
-	 * status code: 0-success 1-fail 2-fail(lack args)
-	 * 
-	 * @param model
-	 * @param status
-	 */
+		* status code: 0-success 1-fail 2-fail(lack args)
+		*
+		* @param model
+		* @param status
+		*/
 	public void setInsertResult(Model model, int status) {
 		if (status == 0) {
 			model.setInsertResult("{\"status\":200}");
@@ -198,7 +271,7 @@ public class Handler implements PageHandler<Context> {
 		}
 	}
 
-	public class AlterationDomain {
+	public static class AlterationDomain {
 
 		private String m_name;
 
@@ -239,7 +312,7 @@ public class Handler implements PageHandler<Context> {
 
 	}
 
-	public class AlterationMinute {
+	public static class AlterationMinute {
 
 		private String m_date;
 
@@ -276,7 +349,5 @@ public class Handler implements PageHandler<Context> {
 		public String getDate() {
 			return m_date;
 		}
-
 	}
-
 }

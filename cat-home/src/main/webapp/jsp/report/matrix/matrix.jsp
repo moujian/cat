@@ -7,7 +7,7 @@
 <jsp:useBean id="payload"	type="com.dianping.cat.report.page.matrix.Payload" scope="request" />
 <jsp:useBean id="model" type="com.dianping.cat.report.page.matrix.Model"	scope="request" />
 
-<a:report title="Matrix Report" navUrlPrefix="domain=${model.domain}">
+<a:hourly_report title="Matrix Report" navUrlPrefix="domain=${model.domain}">
 	<jsp:attribute name="subtitle">${w:format(model.report.startTime,'yyyy-MM-dd HH:mm:ss')} to ${w:format(model.report.endTime,'yyyy-MM-dd HH:mm:ss')}</jsp:attribute>
 	<jsp:body>	
 <script type="text/javascript">
@@ -58,31 +58,31 @@
 			<td class="left longText" style="white-space:normal">${w:shorten(item.name, 120)}</td>
 			<td>${w:format(item.count,'#,###,##0')}</td>
 			<td>${w:format(item.avg,'0.0')}</td>
-			<td class="center"><a href="${model.logViewBaseUri}/${item.url}?domain=${model.domain}">L</a></td>
+			<td class="center"><a href="/cat/r/m/${item.url}?domain=${model.domain}">L</a></td>
 			<td>${item.callMin}</td>
 			<td>${item.callMax}</td>
 			<td>${w:format(item.callAvg,'0.0')}</td>
 			<td>${item.callTime}</td>
 			<td>${w:format(item.callTimePercent,'00.0%')}</td>
-			<td><a href="${model.logViewBaseUri}/${item.callUrl}?domain=${model.domain}">L</a></td>
+			<td><a href="/cat/r/m/${item.callUrl}?domain=${model.domain}">L</a></td>
 		
 			<td>${item.sqlMin}</td>
 			<td>${item.sqlMax}</td>
 			<td>${w:format(item.sqlAvg,'0.0')}</td>
 			<td>${item.sqlTime}</td>
 			<td>${w:format(item.sqlTimePercent,'00.0%')}</td>
-			<td><a href="${model.logViewBaseUri}/${item.sqlUrl}?domain=${model.domain}">L</a></td>
+			<td><a href="/cat/r/m/${item.sqlUrl}?domain=${model.domain}">L</a></td>
 			
 			<td>${item.cacheMin}</td>
 			<td>${item.cacheMax}</td>
 			<td>${w:format(item.cacheAvg,'0.0')}</td>
 			<td>${item.cacheTime}</td>
 			<td>${w:format(item.cacheTimePercent,'00.0%')}</td>
-			<td><a href="${model.logViewBaseUri}/${item.cacheUrl}?domain=${model.domain}">L</a></td>
+			<td><a href="/cat/r/m/${item.cacheUrl}?domain=${model.domain}">L</a></td>
 		</tr>
 	</c:forEach>
 </table></div>
 
 </jsp:body>
-</a:report>
+</a:hourly_report>
 

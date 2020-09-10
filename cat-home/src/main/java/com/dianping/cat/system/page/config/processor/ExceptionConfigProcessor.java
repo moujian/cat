@@ -1,22 +1,32 @@
+/*
+ * Copyright (c) 2011-2018, Meituan Dianping. All Rights Reserved.
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.dianping.cat.system.page.config.processor;
 
 import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map.Entry;
-import java.util.Set;
 
 import org.unidal.lookup.annotation.Inject;
 import org.unidal.lookup.util.StringUtils;
 
-import com.dianping.cat.Constants;
-import com.dianping.cat.helper.TimeHelper;
-import com.dianping.cat.home.bug.entity.BugReport;
 import com.dianping.cat.home.exception.entity.ExceptionExclude;
 import com.dianping.cat.home.exception.entity.ExceptionLimit;
 import com.dianping.cat.report.alert.exception.ExceptionRuleConfigManager;
-import com.dianping.cat.report.page.statistics.service.BugReportService;
 import com.dianping.cat.system.page.config.Action;
 import com.dianping.cat.system.page.config.Model;
 import com.dianping.cat.system.page.config.Payload;
@@ -29,9 +39,6 @@ public class ExceptionConfigProcessor {
 	@Inject
 	private ExceptionRuleConfigManager m_exceptionRuleConfigManager;
 
-	@Inject
-	private BugReportService m_reportService;
-
 	private void deleteExceptionExclude(Payload payload) {
 		m_exceptionRuleConfigManager.deleteExceptionExclude(payload.getDomain(), payload.getException());
 	}
@@ -42,7 +49,23 @@ public class ExceptionConfigProcessor {
 
 	private void loadExceptionConfig(Model model) {
 		model.setExceptionExcludes(m_exceptionRuleConfigManager.queryAllExceptionExcludes());
-		model.setExceptionLimits(m_exceptionRuleConfigManager.queryAllExceptionLimits());
+
+		List<ExceptionLimit> exceptionLimits = m_exceptionRuleConfigManager
+				.queryAllExceptionLimits();
+		rulesAvailableBuild(exceptionLimits);
+		model.setExceptionLimits(exceptionLimits);
+	}
+
+	//增加告警开关功能，但是线上并无available值，这里做一个兼容
+	private void rulesAvailableBuild(List<ExceptionLimit> exceptionLimits) {
+		if (exceptionLimits == null || exceptionLimits.isEmpty()) {
+			return;
+		}
+		for (ExceptionLimit exceptionLimit : exceptionLimits) {
+			if (null == exceptionLimit.getAvailable()) {
+				exceptionLimit.setAvailable(true);
+			}
+		}
 	}
 
 	public void process(Action action, Payload payload, Model model) {
@@ -55,8 +78,8 @@ public class ExceptionConfigProcessor {
 			loadExceptionConfig(model);
 			break;
 		case EXCEPTION_THRESHOLD_UPDATE:
-			model.setExceptionLimit(m_exceptionRuleConfigManager.queryExceptionLimit(payload.getDomain(),
-			      payload.getException()));
+			model.setExceptionLimit(
+									m_exceptionRuleConfigManager.queryExceptionLimit(payload.getDomain(),	payload.getException()));
 			break;
 		case EXCEPTION_THRESHOLD_ADD:
 			List<String> exceptionThresholdList = queryExceptionList();
@@ -89,21 +112,7 @@ public class ExceptionConfigProcessor {
 	}
 
 	private List<String> queryExceptionList() {
-		long current = System.currentTimeMillis();
-		Date start = new Date(current - current % TimeHelper.ONE_HOUR - TimeHelper.ONE_HOUR - TimeHelper.ONE_DAY);
-		Date end = new Date(start.getTime() + TimeHelper.ONE_HOUR);
-		BugReport report = m_reportService.queryReport(Constants.CAT, start, end);
-		Set<String> keys = new HashSet<String>();
-		List<String> exceptions = new ArrayList<String>();
-
-		for (Entry<String, com.dianping.cat.home.bug.entity.Domain> domain : report.getDomains().entrySet()) {
-			keys.addAll(domain.getValue().getExceptionItems().keySet());
-		}
-
-		for (String key : keys) {
-			exceptions.add(key.replaceAll("\n", " ").trim());
-		}
-		return exceptions;
+		return new ArrayList<String>();
 	}
 
 	private void updateExceptionExclude(Payload payload) {
@@ -121,6 +130,7 @@ public class ExceptionConfigProcessor {
 		limit.setDomain(limit.getDomain().trim());
 		limit.setName(limit.getName().trim());
 		limit.setId(limit.getDomain() + ":" + limit.getName());
+		limit.setAvailable(limit.getAvailable());
 
 		if (StringUtils.isNotEmpty(limit.getDomain()) && StringUtils.isNotEmpty(limit.getName())) {
 			m_exceptionRuleConfigManager.insertExceptionLimit(limit);

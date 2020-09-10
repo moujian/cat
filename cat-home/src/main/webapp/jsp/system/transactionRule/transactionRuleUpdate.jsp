@@ -11,7 +11,7 @@
 
 <a:config>
 			<h3 class="text-center text-success">编辑Transaction监控规则</h3>
-			<form name="appRuleUpdate" id="form" method="post">
+			<form name="transactionRuleUpdate" id="form" method="post">
 				<table style='width:100%' class='table table-striped table-condensed '>
 				<c:set var="conditions" value="${fn:split(payload.ruleId, ';')}" />
 				<c:set var="domain" value="${conditions[0]}" />
@@ -25,7 +25,20 @@
 					&nbsp;&nbsp;监控项&nbsp;&nbsp;<select name="monitor" id="monitor" style="width:200px;">
 													<option value="count">执行次数</option>
 								                	<option value="avg">响应时间</option>
+								                	<option value="failRatio">失败率</option>
+								                	<option value="max">最大响应时间</option>
 								            	</select>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;是否告警&nbsp;&nbsp;
+                                                                <c:choose>
+                                                                    <c:when test="${model.available}">
+                                                                        <input type="radio" name="transaction.available" value="true" checked />是&nbsp;&nbsp;&nbsp;
+                                                                        <input type="radio" name="transaction.available" value="false" />否
+                                                                    </c:when>
+                                                                    <c:otherwise>
+                                                                        <input type="radio" name="transaction.available" value="true" />是&nbsp;&nbsp;&nbsp;
+                                                                        <input type="radio" name="transaction.available" value="false" checked />否
+                                                                    </c:otherwise>
+                                                                </c:choose>
 				</tr>
 				<tr><th>${model.content}</th></tr>
 					<tr>
@@ -57,11 +70,13 @@ function update() {
 		name = "All";
 		$("#domain").val("All");
 	}
+
+	var available = $("input[name='transaction.available']:checked").val();
     
     var monitor = $("#monitor").val();
     var split = ";";
     var id = domain + split + type + split + name + split + monitor;
-    window.location.href = "?op=transactionRuleSubmit&configs=" + configStr + "&ruleId=" + id;
+    window.location.href = "?op=transactionRuleSubmit&configs=" + encodeURIComponent(configStr) + "&ruleId=" + encodeURIComponent(id) + "&available=" + encodeURIComponent(available);
 }
 
 	$(document).ready(function() {
@@ -80,7 +95,7 @@ function update() {
 			$("#name").val("All");
 		}
 		
-		$('#application_config').addClass('active open');
+		$('#alert_config').addClass('active open');
 		$('#transactionRule').addClass('active');
 		$(document).delegate("#ruleSubmitButton","click",function(){
 			update();

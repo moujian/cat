@@ -1,8 +1,32 @@
+/*
+ * Copyright (c) 2011-2018, Meituan Dianping. All Rights Reserved.
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.dianping.cat.demo;
 
+import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
+
 import org.junit.Test;
+import org.unidal.helper.Threads;
+import org.unidal.helper.Threads.Task;
 
 import com.dianping.cat.Cat;
+import com.dianping.cat.helper.TimeHelper;
 import com.dianping.cat.message.Message;
 import com.dianping.cat.message.Transaction;
 import com.dianping.cat.message.spi.MessageTree;
@@ -103,6 +127,54 @@ public class TestMaxMessage {
 
 		}
 		Thread.sleep(10 * 1000);
+	}
+
+	@Test
+	public void testThread() throws InterruptedException {
+		ConcurrentHashMap<String, String> map = new ConcurrentHashMap<String, String>();
+		Threads.forGroup("f").start(new ThreadTest(map));
+		Thread.sleep(TimeHelper.ONE_SECOND);
+		int index = 0;
+
+		synchronized (map) {
+			for (Entry<String, String> entry : map.entrySet()) {
+				System.out.println("index:" + index + " " + entry.getKey() + " " + entry.getValue());
+				Thread.sleep(25);
+				index++;
+			}
+		}
+
+	}
+
+	public class ThreadTest implements Task {
+
+		ConcurrentHashMap<String, String> m_map;
+
+		public ThreadTest(ConcurrentHashMap<String, String> map) {
+			m_map = map;
+		}
+
+		@Override
+		public void run() {
+			for (int i = 0; i < 1000; i++) {
+				m_map.put(String.valueOf(i), String.valueOf(i));
+				try {
+					Thread.sleep(10);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+
+		@Override
+		public String getName() {
+			return "cat";
+		}
+
+		@Override
+		public void shutdown() {
+		}
+
 	}
 
 }

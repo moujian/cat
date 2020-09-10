@@ -4,19 +4,13 @@
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core"%>
 <%@ taglib prefix="res" uri="http://www.unidal.org/webres"%>
 <%@ taglib prefix="fn" uri="http://java.sun.com/jsp/jstl/functions" %>
-<jsp:useBean id="ctx" type="com.dianping.cat.report.page.app.Context"
-	scope="request" />
-<jsp:useBean id="payload"
-	type="com.dianping.cat.report.page.app.Payload" scope="request" />
-<jsp:useBean id="model" type="com.dianping.cat.report.page.app.Model"
-	scope="request" />
+<%@ taglib prefix='fmt' uri="http://java.sun.com/jsp/jstl/fmt" %>
+<jsp:useBean id="ctx" type="com.dianping.cat.report.page.app.Context" scope="request" />
+<jsp:useBean id="payload" type="com.dianping.cat.report.page.app.Payload" scope="request" />
+<jsp:useBean id="model" type="com.dianping.cat.report.page.app.Model" scope="request" />
 
-<a:body>
-	<link rel="stylesheet" type="text/css" href="${model.webapp}/js/jquery.datetimepicker.css"/>
-	<script src="${model.webapp}/js/jquery.datetimepicker.js"></script>
-	<res:useJs value="${res.js.local['baseGraph.js']}" target="head-js" />
+<a:mobile>
 	<script type="text/javascript">
-		var commandInfo = ${model.command};
 		function check() {
 			var value = document.getElementById("checkbox").checked;
 
@@ -35,7 +29,7 @@
 				$('#history').slideUp();
 			}
 		}
-		var page2Steps = ${model.page2StepsJson};
+		var page2Steps = ${model.appSpeedDisplayInfo.page2StepsJson};
 		
 		function changeStepByPage(){
 			var page = "";
@@ -53,7 +47,7 @@
 			
 			for(var s in steps){
 				var step = steps[s];
-				if(step['title'] != undefined || step['title'].length > 0){
+				if(step['title'] != undefined && step['title'].length > 0){
 					stepSelect.append($("<option value='"+step['id']+"'>"+step['title']+"</option>"));
 				}else{
 					stepSelect.append($("<option value='"+step['id']+"'>"+step['step']+"</option>"));
@@ -89,7 +83,7 @@
 			var split = ";";
 			var query1 = time + split + page + split + step + split + network
 					+ split + version + split + platform + split + city + split
-					+ operator;
+					+ operator + split + split;
 			var query2 = "";
 			var value = document.getElementById("checkbox").checked;
 
@@ -104,7 +98,7 @@
 				var operator2 = $("#operator2").val();
 				query2 = time2 + split + page2 + split + step2 + split
 						+ network2 + split + version2 + split + platform2
-						+ split + city2 + split + operator2;
+						+ split + city2 + split + operator2 + split + split;
 			}
 
 			window.location.href = "?op=speed&query1=" + query1 + "&query2=" + query2;
@@ -190,7 +184,7 @@
 	</script>
 
 			<%@include file="speedDetail.jsp"%>
-</a:body>
+</a:mobile>
 
 <style type="text/css">
 .row-fluid .span2 {

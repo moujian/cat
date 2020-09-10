@@ -1,3 +1,21 @@
+/*
+ * Copyright (c) 2011-2018, Meituan Dianping. All Rights Reserved.
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.dianping.cat.report.page.state;
 
 import java.util.HashMap;
@@ -20,10 +38,6 @@ public class StateDistirbutionVisitor extends BaseVisitor {
 
 	private String m_attribute = "";
 
-	public Map<String, Double> getDistribute() {
-		return m_distribute;
-	}
-
 	public StateDistirbutionVisitor(String key) {
 		int index = key.indexOf(":");
 
@@ -32,6 +46,21 @@ public class StateDistirbutionVisitor extends BaseVisitor {
 			m_attribute = key.substring(index + 1);
 		} else {
 			m_attribute = key;
+		}
+	}
+
+	public Map<String, Double> getDistribute() {
+		return m_distribute;
+	}
+
+	private void incDistribute(String ip, double value) {
+		if (value > 0) {
+			Double old = m_distribute.get(ip);
+
+			if (old == null) {
+				old = new Double(0);
+			}
+			m_distribute.put(ip, old + value);
 		}
 	}
 
@@ -67,17 +96,6 @@ public class StateDistirbutionVisitor extends BaseVisitor {
 			}
 		}
 		return value;
-	}
-
-	private void incDistribute(String ip, double value) {
-		if (value > 0) {
-			Double old = m_distribute.get(ip);
-
-			if (old == null) {
-				old = new Double(0);
-			}
-			m_distribute.put(ip, old + value);
-		}
 	}
 
 	private double queryValue(String key, ProcessDomain processDomain) {

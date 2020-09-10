@@ -1,3 +1,21 @@
+/*
+ * Copyright (c) 2011-2018, Meituan Dianping. All Rights Reserved.
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.dianping.cat.service;
 
 import java.io.IOException;
@@ -10,7 +28,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import junit.framework.Assert;
-
 import org.junit.Before;
 import org.junit.Test;
 import org.unidal.dal.jdbc.DalException;
@@ -19,10 +36,12 @@ import com.dianping.cat.core.dal.HourlyReport;
 import com.dianping.cat.core.dal.HourlyReportContent;
 import com.dianping.cat.core.dal.HourlyReportContentDao;
 import com.dianping.cat.core.dal.HourlyReportDao;
-import com.dianping.cat.message.spi.core.DomainValidator;
-import com.dianping.cat.service.DefaultReportManager.StoragePolicy;
-import com.dianping.cat.storage.report.ReportBucket;
-import com.dianping.cat.storage.report.ReportBucketManager;
+import com.dianping.cat.report.DefaultReportManager;
+import com.dianping.cat.report.DefaultReportManager.StoragePolicy;
+import com.dianping.cat.report.DomainValidator;
+import com.dianping.cat.report.ReportBucket;
+import com.dianping.cat.report.ReportBucketManager;
+import com.dianping.cat.report.ReportDelegate;
 
 public class DefaultReportManagerTest {
 
@@ -42,7 +61,7 @@ public class DefaultReportManagerTest {
 
 	private MockHourlyReportDao m_hourlyReportDao = new MockHourlyReportDao();
 
-	private MockBuckerManager m_bucketManager = new MockBuckerManager();
+	private MockBucketManager m_bucketManager = new MockBucketManager();
 
 	private long m_start;
 
@@ -60,10 +79,10 @@ public class DefaultReportManagerTest {
 	}
 
 	@Test
-	public void testClean(){
-		long hour = 3600*1000L;
-		m_manager.getHourlyReport(m_start-3*hour, DOMAIN1, true);
-		m_manager.getHourlyReport(m_start-4*hour, DOMAIN2, true);
+	public void testClean() {
+		long hour = 3600 * 1000L;
+		m_manager.getHourlyReport(m_start - 3 * hour, DOMAIN1, true);
+		m_manager.getHourlyReport(m_start - 4 * hour, DOMAIN2, true);
 		m_manager.getHourlyReport(m_start, DOMAIN3, true);
 		m_manager.cleanup(m_start);
 
@@ -97,7 +116,7 @@ public class DefaultReportManagerTest {
 
 	@Test
 	public void testLoadReport() {
-		m_manager.loadHourlyReports(m_start, null);
+		m_manager.loadHourlyReports(m_start, null, 0);
 
 		Map<String, String> reports = m_manager.getHourlyReports(m_start);
 		Assert.assertEquals(3, reports.size());
@@ -112,27 +131,27 @@ public class DefaultReportManagerTest {
 		m_manager.getHourlyReport(m_start, DOMAIN1, true);
 		m_manager.getHourlyReport(m_start, DOMAIN2, true);
 		m_manager.getHourlyReport(m_start, DOMAIN3, true);
-		m_manager.storeHourlyReports(m_start, StoragePolicy.FILE_AND_DB);
+		m_manager.storeHourlyReports(m_start, StoragePolicy.FILE_AND_DB, 0);
 
 		Assert.assertEquals(3, m_reportContentDao.count);
 		Assert.assertEquals(3, m_hourlyReportDao.count);
 		Assert.assertEquals(3, m_bucketInsertCount);
 	}
 
-	public class MockBuckerManager implements ReportBucketManager {
+	public class MockBucketManager implements ReportBucketManager {
 
 		@Override
-		public void closeBucket(ReportBucket<?> bucket) {
+		public void closeBucket(ReportBucket bucket) {
 		}
 
 		@Override
-		public ReportBucket<String> getReportBucket(long timestamp, String name) throws IOException {
+		public ReportBucket getReportBucket(long timestamp, String name, int index) throws IOException {
 			return new MockStringBucket();
 		}
 
 		@Override
-      public void clearOldReports() {
-      }
+		public void clearOldReports() {
+		}
 
 	}
 
@@ -210,7 +229,7 @@ public class DefaultReportManagerTest {
 
 	}
 
-	public class MockStringBucket implements ReportBucket<String> {
+	public class MockStringBucket implements ReportBucket {
 
 		@Override
 		public void close() throws IOException {
@@ -236,7 +255,7 @@ public class DefaultReportManagerTest {
 		}
 
 		@Override
-		public void initialize(Class<?> type, String name, Date timestamp) throws IOException {
+		public void initialize(String name, Date timestamp, int index) throws IOException {
 		}
 
 		@Override

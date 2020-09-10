@@ -1,3 +1,21 @@
+/*
+ * Copyright (c) 2011-2018, Meituan Dianping. All Rights Reserved.
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.dianping.cat.report.page.cross.display;
 
 import java.util.ArrayList;
@@ -18,7 +36,7 @@ import com.dianping.cat.service.HostinfoService;
 
 public class MethodInfo extends BaseVisitor {
 
-	private static final String ALL_METHOD = "AllMethods";
+	private static final String ALL_METHODS = "AllMethods";
 
 	private Map<String, NameDetailInfo> m_callProjectsInfo = new LinkedHashMap<String, NameDetailInfo>();
 
@@ -44,7 +62,7 @@ public class MethodInfo extends BaseVisitor {
 
 	private String m_serviceSortBy = "Avg";
 
-	private HostinfoService m_hostinfoService;
+	private HostinfoService m_hostInfoService;
 
 	public MethodInfo(long reportDuration) {
 		m_reportDuration = reportDuration;
@@ -52,11 +70,11 @@ public class MethodInfo extends BaseVisitor {
 
 	private void addCallerProject(String type, Name name) {
 		String id = name.getId();
-		NameDetailInfo all = m_callerProjectsInfo.get(ALL_METHOD);
+		NameDetailInfo all = m_callerProjectsInfo.get(ALL_METHODS);
 
 		if (all == null) {
-			all = new NameDetailInfo(m_reportDuration, ALL_METHOD, m_remoteIp, type);
-			m_callerProjectsInfo.put(ALL_METHOD, all);
+			all = new NameDetailInfo(m_reportDuration, ALL_METHODS, m_remoteIp, type);
+			m_callerProjectsInfo.put(ALL_METHODS, all);
 		}
 		NameDetailInfo info = m_callerProjectsInfo.get(id);
 
@@ -70,11 +88,11 @@ public class MethodInfo extends BaseVisitor {
 
 	private void addCallProject(String type, Name name) {
 		String id = name.getId();
-		NameDetailInfo all = m_callProjectsInfo.get(ALL_METHOD);
+		NameDetailInfo all = m_callProjectsInfo.get(ALL_METHODS);
 
 		if (all == null) {
-			all = new NameDetailInfo(m_reportDuration, ALL_METHOD, m_remoteIp, type);
-			m_callProjectsInfo.put(ALL_METHOD, all);
+			all = new NameDetailInfo(m_reportDuration, ALL_METHODS, m_remoteIp, type);
+			m_callProjectsInfo.put(ALL_METHODS, all);
 		}
 		NameDetailInfo info = m_callProjectsInfo.get(id);
 
@@ -88,11 +106,11 @@ public class MethodInfo extends BaseVisitor {
 
 	private void addServiceProject(String type, Name name) {
 		String id = name.getId();
-		NameDetailInfo all = m_serviceProjectsInfo.get(ALL_METHOD);
+		NameDetailInfo all = m_serviceProjectsInfo.get(ALL_METHODS);
 
 		if (all == null) {
-			all = new NameDetailInfo(m_reportDuration, ALL_METHOD, m_remoteIp, type);
-			m_serviceProjectsInfo.put(ALL_METHOD, all);
+			all = new NameDetailInfo(m_reportDuration, ALL_METHODS, m_remoteIp, type);
+			m_serviceProjectsInfo.put(ALL_METHODS, all);
 		}
 		NameDetailInfo info = m_serviceProjectsInfo.get(id);
 
@@ -117,6 +135,11 @@ public class MethodInfo extends BaseVisitor {
 
 	public String getQuery() {
 		return m_query;
+	}
+
+	public MethodInfo setQuery(String query) {
+		m_query = query;
+		return this;
 	}
 
 	public long getReportDuration() {
@@ -158,7 +181,7 @@ public class MethodInfo extends BaseVisitor {
 				if (ip.indexOf(':') > 0) {
 					ip = ip.substring(0, ip.indexOf(':'));
 				}
-				String domain = m_hostinfoService.queryDomainByIp(ip);
+				String domain = m_hostInfoService.queryDomainByIp(ip);
 				if (projectName.equalsIgnoreCase(domain)) {
 					return true;
 				}
@@ -179,12 +202,7 @@ public class MethodInfo extends BaseVisitor {
 	}
 
 	public void setHostinfoService(HostinfoService hostinfoService) {
-		m_hostinfoService = hostinfoService;
-	}
-
-	public MethodInfo setQuery(String query) {
-		m_query = query;
-		return this;
+		m_hostInfoService = hostinfoService;
 	}
 
 	public MethodInfo setRemoteIp(String remoteIp) {
@@ -230,13 +248,13 @@ public class MethodInfo extends BaseVisitor {
 
 		if (ip == null) {
 			ip = remote.getId();
-			
+
 			if (ip.endsWith(":Caller") && role.endsWith("Caller")) {
 				ip = ip.substring(0, ip.indexOf(":Caller"));
 			}
 		}
 		String app = remote.getApp();
-		
+
 		if (projectContains(m_remoteProject, app, ip, role) || m_remoteIp.equals(ip)) {
 			m_currentRole = role;
 			super.visitRemote(remote);

@@ -1,23 +1,22 @@
+/*
+ * Copyright (c) 2011-2018, Meituan Dianping. All Rights Reserved.
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.dianping.cat.report.page.dependency;
-
-import java.io.IOException;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-
-import javax.servlet.ServletException;
-
-import org.unidal.lookup.annotation.Inject;
-import org.unidal.lookup.util.StringUtils;
-import org.unidal.web.mvc.PageHandler;
-import org.unidal.web.mvc.annotation.InboundActionMeta;
-import org.unidal.web.mvc.annotation.OutboundActionMeta;
-import org.unidal.web.mvc.annotation.PayloadMeta;
 
 import com.dianping.cat.consumer.dependency.DependencyAnalyzer;
 import com.dianping.cat.consumer.dependency.DependencyReportMerger;
@@ -29,27 +28,38 @@ import com.dianping.cat.helper.TimeHelper;
 import com.dianping.cat.home.dependency.graph.entity.TopologyGraph;
 import com.dianping.cat.home.dependency.graph.entity.TopologyNode;
 import com.dianping.cat.home.dependency.graph.transform.DefaultJsonBuilder;
+import com.dianping.cat.mvc.PayloadNormalizer;
 import com.dianping.cat.report.ReportPage;
 import com.dianping.cat.report.graph.LineChart;
-import com.dianping.cat.report.page.PayloadNormalizer;
 import com.dianping.cat.report.page.dependency.config.TopoGraphFormatConfigManager;
 import com.dianping.cat.report.page.dependency.graph.LineGraphBuilder;
 import com.dianping.cat.report.page.dependency.graph.ProductLinesDashboard;
 import com.dianping.cat.report.page.dependency.graph.TopologyGraphManager;
+import com.dianping.cat.report.service.ModelRequest;
+import com.dianping.cat.report.service.ModelResponse;
 import com.dianping.cat.report.service.ModelService;
-import com.dianping.cat.service.ModelRequest;
-import com.dianping.cat.service.ModelResponse;
+import org.unidal.lookup.annotation.Inject;
+import org.unidal.lookup.util.StringUtils;
+import org.unidal.web.mvc.PageHandler;
+import org.unidal.web.mvc.annotation.InboundActionMeta;
+import org.unidal.web.mvc.annotation.OutboundActionMeta;
+import org.unidal.web.mvc.annotation.PayloadMeta;
+
+import javax.servlet.ServletException;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.*;
+import java.util.Map.Entry;
 
 public class Handler implements PageHandler<Context> {
+
+	public static final List<String> NORMAL_URLS = Arrays.asList("/cat/r", "/cat/r/", "/cat/r/dependency");
 
 	@Inject(type = ModelService.class, value = DependencyAnalyzer.ID)
 	private ModelService<DependencyReport> m_dependencyService;
 
 	@Inject
 	private TopologyGraphManager m_graphManager;
-
-	@Inject
-	private TopoGraphFormatConfigManager m_formatConfigManager;
 
 	@Inject
 	private ExternalInfoBuilder m_externalInfoBuilder;
@@ -60,9 +70,8 @@ public class Handler implements PageHandler<Context> {
 	@Inject
 	private PayloadNormalizer m_normalizePayload;
 
-	public static final List<String> NORMAL_URLS = Arrays.asList("/cat/r", "/cat/r/", "/cat/r/dependency");
-
-	public static final String TUAN_TOU = "TuanGou";
+	@Inject
+	private TopoGraphFormatConfigManager m_formatConfigManager;
 
 	private Segment buildAllSegmentsInfo(DependencyReport report) {
 		Segment result = new Segment();
@@ -96,7 +105,7 @@ public class Handler implements PageHandler<Context> {
 			for (TopologyNode node : n) {
 				String domain = node.getId();
 				String link = String.format("?op=dependencyGraph&minute=%s&domain=%s&date=%s", minute, domain,
-				      sdf.format(new Date(payload.getDate())));
+										sdf.format(new Date(payload.getDate())));
 				node.setLink(link);
 			}
 		}
@@ -163,7 +172,7 @@ public class Handler implements PageHandler<Context> {
 		m_externalInfoBuilder.buildExceptionInfoOnGraph(payload, model, topologyGraph);
 		model.setReportStart(new Date(payload.getDate()));
 		model.setReportEnd(new Date(payload.getDate() + TimeHelper.ONE_HOUR - 1));
-		String build = new DefaultJsonBuilder().build(topologyGraph); 
+		String build = new DefaultJsonBuilder().build(topologyGraph);
 
 		model.setTopologyGraph(build);
 	}
@@ -203,20 +212,13 @@ public class Handler implements PageHandler<Context> {
 		}
 	}
 
-	private boolean validate(Context ctx) {
-		String url = ctx.getRequestContext().getActionUri();
-		String actionUrl = url.split("\\?")[0];
-
-		return NORMAL_URLS.contains(actionUrl);
-	}
-
 	private void normalize(Model model, Payload payload) {
 		model.setPage(ReportPage.DEPENDENCY);
-		model.setAction(Action.LINE_CHART);
+		model.setAction(payload.getAction());
 
 		m_normalizePayload.normalize(model, payload);
 
-		Integer minute = parseQueryMinute(payload);
+		int minute = parseQueryMinute(payload);
 		int maxMinute = 60;
 		List<Integer> minutes = new ArrayList<Integer>();
 
@@ -262,6 +264,13 @@ public class Handler implements PageHandler<Context> {
 		} else {
 			throw new RuntimeException("Internal error: no eligable dependency service registered for " + request + "!");
 		}
+	}
+
+	private boolean validate(Context ctx) {
+		String url = ctx.getRequestContext().getActionUri();
+		String actionUrl = url.split("\\?")[0];
+
+		return NORMAL_URLS.contains(actionUrl);
 	}
 
 }

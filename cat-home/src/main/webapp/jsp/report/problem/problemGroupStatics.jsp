@@ -9,14 +9,13 @@
 <jsp:useBean id="model"	type="com.dianping.cat.report.page.problem.Model" scope="request" />
 <c:set var="report" value="${model.report}" />
 
-<a:report title="Problem Report"
+<a:hourly_report title="Problem Report"
 	navUrlPrefix="op=${payload.action.name}&domain=${model.domain}&group=${payload.group}&group=${payload.group}${payload.queryString}"
 	timestamp="${w:format(model.creatTime,'yyyy-MM-dd HH:mm:ss')}">
 
 	<jsp:attribute name="subtitle">${w:format(report.startTime,'yyyy-MM-dd HH:mm:ss')} to ${w:format(report.endTime,'yyyy-MM-dd HH:mm:ss')}</jsp:attribute>
 
 	<jsp:body>
-	<res:useJs value="${res.js.local['baseGraph.js']}" target="head-js"/>
 	<table class="machines">
 	<tr style="text-align:left">
 		<th>&nbsp;[&nbsp; 
@@ -92,7 +91,7 @@
 				&nbsp;<a href="#" class="${statistics.value.type}">&nbsp;&nbsp;</a>
 				&nbsp;&nbsp;${statistics.value.type}
 				</br>
-				<a href="?op=groupGraphs&domain=${model.domain}&date=${model.date}&group=${payload.group}&reportType=${model.reportType}&type=${statistics.value.type}${model.customDate}" class="history_graph_link" data-status="${typeIndex.index}">[:: show ::]</a>
+				<a href="?op=groupGraphs&domain=${model.domain}&date=${model.date}&group=${payload.group}&reportType=${payload.reportType}&type=${statistics.value.type}${model.customDate}" class="history_graph_link" data-status="${typeIndex.index}">[:: show ::]</a>
 			</td>
 			<td rowspan="${w:size(statistics.value.status)*3}"  right top">${w:format(statistics.value.count,'#,###,###,###,##0')}&nbsp;</td>
 			<c:forEach var="status" items="${statistics.value.status}"
@@ -101,13 +100,13 @@
 					<tr>
 				</c:if>
 				<td>
-					<a href="?op=groupGraphs&domain=${model.domain}&date=${model.date}&group=${payload.group}&reportType=${model.reportType}&type=${statistics.value.type}&status=${status.value.status}${model.customDate}" class="problem_status_graph_link" data-status="${statistics.value.type}${status.value.status}">[:: show ::]</a>
+					<a href="?op=groupGraphs&domain=${model.domain}&date=${model.date}&group=${payload.group}&reportType=${payload.reportType}&type=${statistics.value.type}&status=${status.value.status}${model.customDate}" class="problem_status_graph_link" data-status="${statistics.value.type}${status.value.status}">[:: show ::]</a>
 					&nbsp;${status.value.status}
 				</td>
 				<td class="right">${w:format(status.value.count,'#,###,###,###,##0')}&nbsp;</td>
 				<td >
 					<c:forEach var="links" items="${status.value.links}" varStatus="linkIndex">
-						<a href="${model.logViewBaseUri}/${links}?domain=${model.domain}">${linkIndex.first?'L':(linkIndex.last?'g':'o')}</a>
+						<a href="/cat/r/m/${links}?domain=${model.domain}">${linkIndex.first?'L':(linkIndex.last?'g':'o')}</a>
 					</c:forEach></td>
 						
 				<c:if test="${index.index != 0}">
@@ -126,4 +125,4 @@
 <res:useJs value="${res.js.local.problemHistory_js}" target="bottom-js" />
 </jsp:body>
 
-</a:report>
+</a:hourly_report>

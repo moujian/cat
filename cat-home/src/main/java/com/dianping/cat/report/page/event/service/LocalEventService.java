@@ -1,23 +1,45 @@
+/*
+ * Copyright (c) 2011-2018, Meituan Dianping. All Rights Reserved.
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.dianping.cat.report.page.event.service;
 
 import java.util.Date;
+import java.util.List;
 
 import org.unidal.lookup.annotation.Inject;
+import org.unidal.lookup.annotation.Named;
 
-import com.dianping.cat.BasePayload;
 import com.dianping.cat.Constants;
 import com.dianping.cat.consumer.event.EventAnalyzer;
+import com.dianping.cat.consumer.event.EventReportMerger;
 import com.dianping.cat.consumer.event.model.entity.EventName;
 import com.dianping.cat.consumer.event.model.entity.EventReport;
 import com.dianping.cat.consumer.event.model.entity.EventType;
 import com.dianping.cat.consumer.event.model.transform.DefaultSaxParser;
 import com.dianping.cat.helper.TimeHelper;
+import com.dianping.cat.mvc.ApiPayload;
+import com.dianping.cat.report.ReportBucket;
+import com.dianping.cat.report.ReportBucketManager;
 import com.dianping.cat.report.service.LocalModelService;
-import com.dianping.cat.service.ModelPeriod;
-import com.dianping.cat.service.ModelRequest;
-import com.dianping.cat.storage.report.ReportBucket;
-import com.dianping.cat.storage.report.ReportBucketManager;
+import com.dianping.cat.report.service.ModelPeriod;
+import com.dianping.cat.report.service.ModelRequest;
 
+@Named(type = LocalModelService.class, value = LocalEventService.ID)
 public class LocalEventService extends LocalModelService<EventReport> {
 
 	public static final String ID = EventAnalyzer.ID;
@@ -29,18 +51,29 @@ public class LocalEventService extends LocalModelService<EventReport> {
 		super(EventAnalyzer.ID);
 	}
 
-	private String filterReport(BasePayload payload, EventReport report) {
-	   String ipAddress = payload.getIpAddress();
+	private String filterReport(ApiPayload payload, EventReport report) {
+		String ipAddress = payload.getIpAddress();
 		String type = payload.getType();
 		String name = payload.getName();
-		EventReportFilter filter = new EventReportFilter(type, name, ipAddress );
+		EventReportFilter filter = new EventReportFilter(type, name, ipAddress);
 
 		return filter.buildXml(report);
-   }
+	}
 
 	@Override
-	public String getReport(ModelRequest request, ModelPeriod period, String domain,BasePayload payload) throws Exception {
-		EventReport report = super.getReport( period, domain);
+	public String buildReport(ModelRequest request, ModelPeriod period, String domain, ApiPayload payload)
+							throws Exception {
+		List<EventReport> reports = super.getReport(period, domain);
+		EventReport report = null;
+
+		if (reports != null) {
+			report = new EventReport(domain);
+			EventReportMerger merger = new EventReportMerger(report);
+
+			for (EventReport tmp : reports) {
+				tmp.accept(merger);
+			}
+		}
 
 		if ((report == null || report.getIps().isEmpty()) && period.isLast()) {
 			long startTime = request.getStartTime();
@@ -50,30 +83,32 @@ public class LocalEventService extends LocalModelService<EventReport> {
 	}
 
 	private EventReport getReportFromLocalDisk(long timestamp, String domain) throws Exception {
-		ReportBucket<String> bucket = null;
+		EventReport report = new EventReport(domain);
+		EventReportMerger merger = new EventReportMerger(report);
 
-		try {
-			bucket = m_bucketManager.getReportBucket(timestamp, EventAnalyzer.ID);
-			String xml = bucket.findById(domain);
-			EventReport report = null;
+		report.setStartTime(new Date(timestamp));
+		report.setEndTime(new Date(timestamp + TimeHelper.ONE_HOUR - 1));
 
-			if (xml != null) {
-				report = DefaultSaxParser.parse(xml);
-			} else {
-				report = new EventReport(domain);
-				report.setStartTime(new Date(timestamp));
-				report.setEndTime(new Date(timestamp + TimeHelper.ONE_HOUR - 1));
-				report.getDomainNames().addAll(bucket.getIds());
-			}
-			return report;
+		for (int i = 0; i < getAnalyzerCount(); i++) {
+			ReportBucket bucket = null;
+			try {
+				bucket = m_bucketManager.getReportBucket(timestamp, EventAnalyzer.ID, i);
+				String xml = bucket.findById(domain);
 
-		} finally {
-			if (bucket != null) {
-				m_bucketManager.closeBucket(bucket);
+				if (xml != null) {
+					EventReport tmp = DefaultSaxParser.parse(xml);
+
+					tmp.accept(merger);
+				}
+			} finally {
+				if (bucket != null) {
+					m_bucketManager.closeBucket(bucket);
+				}
 			}
 		}
+		return report;
 	}
-	
+
 	public static class EventReportFilter extends com.dianping.cat.consumer.event.model.transform.DefaultXmlBuilder {
 		private String m_ipAddress;
 

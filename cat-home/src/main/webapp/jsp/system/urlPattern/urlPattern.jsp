@@ -4,14 +4,14 @@
 <%@ taglib prefix="res" uri="http://www.unidal.org/webres"%>
 <%@ taglib prefix="w" uri="http://www.unidal.org/web/core"%>
 
-<jsp:useBean id="ctx" type="com.dianping.cat.system.page.config.Context" scope="request"/>
-<jsp:useBean id="payload" type="com.dianping.cat.system.page.config.Payload" scope="request"/>
-<jsp:useBean id="model" type="com.dianping.cat.system.page.config.Model" scope="request"/>
+<jsp:useBean id="ctx" type="com.dianping.cat.system.page.web.Context" scope="request"/>
+<jsp:useBean id="payload" type="com.dianping.cat.system.page.web.Payload" scope="request"/>
+<jsp:useBean id="model" type="com.dianping.cat.system.page.web.Model" scope="request"/>
 
-<a:config>
+<a:web_body>
 	<script type="text/javascript">
 		$(document).ready(function() {
-			$('#userMonitor_config').addClass('active open');
+			$('#Web_config').addClass('active open');
 			$('#urlPatterns').addClass('active');
 		});
 	</script>
@@ -29,16 +29,16 @@
 				<c:forEach var="item" items="${model.patternItems}"
 					varStatus="status">
 					<tr class="">
-						<td>${item.name}</td>
-						<td>${item.group}</td>
-						<td>${item.pattern}</td>
-						<td>${item.domain}</td>
-						<td><a href="?op=urlPatternUpdate&key=${item.name}" class="btn btn-primary btn-xs">
+						<td>${item.value.name}</td>
+						<td>${item.value.group}</td>
+						<td>${item.value.pattern}</td>
+						<td>${item.value.domain}</td>
+						<td><a href="?op=urlPatternUpdate&key=${item.value.name}" class="btn btn-primary btn-xs">
 						<i class="ace-icon fa fa-pencil-square-o bigger-120"></i></a>
-						<a href="?op=urlPatternDelete&key=${item.name}" class="btn btn-danger btn-xs delete" >
+						<a href="?op=urlPatternDelete&key=${item.value.name}" class="btn btn-danger btn-xs delete" >
 						<i class="ace-icon fa fa-trash-o bigger-120"></i></a></td>
 					</tr>
 				</c:forEach></tbody>
 				</tbody>
 			</table>
-</a:config>
+</a:web_body>

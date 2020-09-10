@@ -1,29 +1,47 @@
+/*
+ * Copyright (c) 2011-2018, Meituan Dianping. All Rights Reserved.
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.dianping.cat.consumer.problem;
 
-import java.util.Date;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-
-import org.unidal.lookup.annotation.Inject;
-
 import com.dianping.cat.Cat;
-import com.dianping.cat.configuration.ServerConfigManager;
+import com.dianping.cat.config.server.ServerFilterConfigManager;
 import com.dianping.cat.consumer.problem.model.entity.ProblemReport;
 import com.dianping.cat.consumer.problem.model.transform.DefaultNativeBuilder;
 import com.dianping.cat.consumer.problem.model.transform.DefaultNativeParser;
 import com.dianping.cat.consumer.problem.model.transform.DefaultSaxParser;
-import com.dianping.cat.service.ReportDelegate;
+import com.dianping.cat.report.ReportDelegate;
 import com.dianping.cat.task.TaskManager;
 import com.dianping.cat.task.TaskManager.TaskProlicy;
+import org.unidal.lookup.annotation.Inject;
+import org.unidal.lookup.annotation.Named;
 
+import java.util.Date;
+import java.util.Map;
+import java.util.Map.Entry;
+
+@Named(type = ReportDelegate.class, value = ProblemAnalyzer.ID)
 public class ProblemDelegate implements ReportDelegate<ProblemReport> {
 
 	@Inject
 	private TaskManager m_taskManager;
 
 	@Inject
-	private ServerConfigManager m_manager;
+	private ServerFilterConfigManager m_configManager;
 
 	@Override
 	public void afterLoad(Map<String, ProblemReport> reports) {
@@ -31,13 +49,6 @@ public class ProblemDelegate implements ReportDelegate<ProblemReport> {
 
 	@Override
 	public void beforeSave(Map<String, ProblemReport> reports) {
-		for (ProblemReport report : reports.values()) {
-			Set<String> domainNames = report.getDomainNames();
-
-			domainNames.clear();
-			domainNames.addAll(reports.keySet());
-		}
-
 		try {
 			ProblemReportFilter problemReportURLFilter = new ProblemReportFilter();
 
@@ -65,11 +76,8 @@ public class ProblemDelegate implements ReportDelegate<ProblemReport> {
 	public boolean createHourlyTask(ProblemReport report) {
 		String domain = report.getDomain();
 
-		if (m_manager.validateDomain(domain)) {
-			return m_taskManager.createTask(report.getStartTime(), domain, ProblemAnalyzer.ID, TaskProlicy.ALL);
-		} else if (m_manager.isCrashLog(domain)) {
-			return m_taskManager.createTask(report.getStartTime(), domain, ProblemAnalyzer.ID,
-			      TaskProlicy.ALL_EXCLUED_HOURLY);
+		if (m_configManager.validateDomain(domain)) {
+			return m_taskManager.createTask(report.getStartTime(), domain, ProblemAnalyzer.ID,	TaskProlicy.ALL_EXCLUED_HOURLY);
 		} else {
 			return true;
 		}
@@ -105,8 +113,6 @@ public class ProblemDelegate implements ReportDelegate<ProblemReport> {
 
 	@Override
 	public ProblemReport parseXml(String xml) throws Exception {
-		ProblemReport report = DefaultSaxParser.parse(xml);
-
-		return report;
+		return DefaultSaxParser.parse(xml);
 	}
 }

@@ -1,3 +1,21 @@
+/*
+ * Copyright (c) 2011-2018, Meituan Dianping. All Rights Reserved.
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.dianping.cat.report.page.state;
 
 import java.util.ArrayList;
@@ -7,9 +25,10 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import org.unidal.lookup.annotation.Inject;
+import org.unidal.lookup.annotation.Named;
 import org.unidal.tuple.Pair;
 
-import com.dianping.cat.configuration.ServerConfigManager;
+import com.dianping.cat.config.server.ServerFilterConfigManager;
 import com.dianping.cat.consumer.state.model.entity.StateReport;
 import com.dianping.cat.helper.TimeHelper;
 import com.dianping.cat.report.graph.LineChart;
@@ -17,20 +36,14 @@ import com.dianping.cat.report.graph.PieChart;
 import com.dianping.cat.report.graph.PieChart.Item;
 import com.dianping.cat.report.page.state.service.StateReportService;
 
+@Named
 public class StateGraphBuilder {
 
 	@Inject
 	private StateReportService m_reportService;
 
 	@Inject
-	private ServerConfigManager m_configManager;
-
-	public Pair<LineChart, PieChart> buildGraph(Payload payload, String key, StateReport report) {
-		String domain = payload.getDomain();
-		String ips = payload.getIpAddress();
-
-		return buildHourlyGraph(report, domain, key, ips);
-	}
+	private ServerFilterConfigManager m_serverFilterConfigManager;
 
 	public Pair<LineChart, PieChart> buildGraph(Payload payload, String key) {
 		String domain = payload.getDomain();
@@ -41,10 +54,16 @@ public class StateGraphBuilder {
 		return buildHistoryGraph(domain, start, end, key, ips);
 	}
 
+	public Pair<LineChart, PieChart> buildGraph(Payload payload, String key, StateReport report) {
+		String domain = payload.getDomain();
+		String ips = payload.getIpAddress();
+
+		return buildHourlyGraph(report, domain, key, ips);
+	}
+
 	private Pair<LineChart, PieChart> buildHistoryGraph(String domain, Date start, Date end, String key, String ip) {
 		List<StateReport> reports = new ArrayList<StateReport>();
-		StateHistoryGraphVisitor builder = new StateHistoryGraphVisitor(ip, m_configManager.getUnusedDomains(),
-		      start.getTime(), end.getTime(), key);
+		StateHistoryGraphVisitor builder = new StateHistoryGraphVisitor(ip, start.getTime(), end.getTime(), key);
 		StateDistirbutionVisitor visitor = new StateDistirbutionVisitor(key);
 		long step;
 
@@ -73,7 +92,8 @@ public class StateGraphBuilder {
 
 	private Pair<LineChart, PieChart> buildHourlyGraph(StateReport report, String domain, String key, String ip) {
 		LineChart linechart = new LineChart();
-		StateHourlyGraphVisitor builder = new StateHourlyGraphVisitor(ip, m_configManager.getUnusedDomains(), key, 60);
+		StateHourlyGraphVisitor builder = new StateHourlyGraphVisitor(ip, m_serverFilterConfigManager.getUnusedDomains(),	key,
+								60);
 
 		builder.visitStateReport(report);
 		linechart.setStart(report.getStartTime()).setSize(60).setTitle(key).setStep(TimeHelper.ONE_MINUTE);
@@ -82,7 +102,7 @@ public class StateGraphBuilder {
 		StateDistirbutionVisitor visitor = new StateDistirbutionVisitor(key);
 
 		visitor.visitStateReport(report);
-		
+
 		Map<String, Double> distributes = visitor.getDistribute();
 		PieChart piechart = buildPiechart(distributes);
 

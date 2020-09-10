@@ -1,17 +1,38 @@
+/*
+ * Copyright (c) 2011-2018, Meituan Dianping. All Rights Reserved.
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.dianping.cat.report.page.storage;
 
+import javax.servlet.ServletException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
-import javax.servlet.ServletException;
-
+import org.unidal.dal.jdbc.DalNotFoundException;
 import org.unidal.lookup.annotation.Inject;
 import org.unidal.lookup.util.StringUtils;
 import org.unidal.tuple.Pair;
@@ -20,27 +41,36 @@ import org.unidal.web.mvc.annotation.InboundActionMeta;
 import org.unidal.web.mvc.annotation.OutboundActionMeta;
 import org.unidal.web.mvc.annotation.PayloadMeta;
 
+import com.dianping.cat.Cat;
 import com.dianping.cat.Constants;
+import com.dianping.cat.alarm.Alert;
+import com.dianping.cat.alarm.service.AlertService;
 import com.dianping.cat.consumer.storage.StorageAnalyzer;
+import com.dianping.cat.consumer.storage.builder.StorageBuilderManager;
 import com.dianping.cat.consumer.storage.model.entity.StorageReport;
 import com.dianping.cat.helper.JsonBuilder;
 import com.dianping.cat.helper.SortHelper;
 import com.dianping.cat.helper.TimeHelper;
+import com.dianping.cat.home.dal.report.Alteration;
+import com.dianping.cat.home.dal.report.AlterationDao;
+import com.dianping.cat.home.dal.report.AlterationEntity;
 import com.dianping.cat.home.storage.alert.entity.Storage;
 import com.dianping.cat.home.storage.alert.entity.StorageAlertInfo;
+import com.dianping.cat.mvc.PayloadNormalizer;
 import com.dianping.cat.report.ReportPage;
 import com.dianping.cat.report.graph.LineChart;
-import com.dianping.cat.report.page.PayloadNormalizer;
 import com.dianping.cat.report.page.storage.config.StorageGroupConfigManager;
 import com.dianping.cat.report.page.storage.config.StorageGroupConfigManager.Department;
+import com.dianping.cat.report.page.storage.display.StorageAlertInfoBuilder;
+import com.dianping.cat.report.page.storage.display.StorageSorter;
 import com.dianping.cat.report.page.storage.task.StorageReportService;
-import com.dianping.cat.report.page.storage.topology.StorageAlertInfoManager;
 import com.dianping.cat.report.page.storage.transform.HourlyLineChartVisitor;
+import com.dianping.cat.report.page.storage.transform.PieChartVisitor;
 import com.dianping.cat.report.page.storage.transform.StorageMergeHelper;
 import com.dianping.cat.report.page.storage.transform.StorageOperationFilter;
+import com.dianping.cat.report.service.ModelRequest;
+import com.dianping.cat.report.service.ModelResponse;
 import com.dianping.cat.report.service.ModelService;
-import com.dianping.cat.service.ModelRequest;
-import com.dianping.cat.service.ModelResponse;
 
 public class Handler implements PageHandler<Context> {
 	@Inject
@@ -59,18 +89,27 @@ public class Handler implements PageHandler<Context> {
 	private StorageMergeHelper m_mergeHelper;
 
 	@Inject
-	private StorageAlertInfoManager m_alertInfoManager;
-
-	@Inject
 	private StorageGroupConfigManager m_storageGroupConfigManager;
 
 	@Inject
 	private JsonBuilder m_jsonBuilder;
 
+	@Inject
+	private AlterationDao m_alterationDao;
+
+	@Inject
+	private AlertService m_alertService;
+
+	@Inject
+	private StorageAlertInfoBuilder m_alertInfoBuilder;
+
+	@Inject
+	private StorageBuilderManager m_storageBuilderManager;
+
 	private Map<String, Map<String, List<String>>> buildAlertLinks(Map<String, StorageAlertInfo> alertInfos, String type) {
 		Map<String, Map<String, List<String>>> links = new LinkedHashMap<String, Map<String, List<String>>>();
-		String format = m_storageGroupConfigManager.getSqlLinkFormat();
-		
+		String format = m_storageGroupConfigManager.queryLinkFormat(type);
+
 		if (format != null) {
 			for (Entry<String, StorageAlertInfo> alertInfo : alertInfos.entrySet()) {
 				String key = alertInfo.getKey();
@@ -102,9 +141,33 @@ public class Handler implements PageHandler<Context> {
 		return links;
 	}
 
-	private void buildLineCharts(Model model, Payload payload, String ipAddress, StorageReport storageReport) {
-		HourlyLineChartVisitor visitor = new HourlyLineChartVisitor(ipAddress, payload.getProject(),
-		      storageReport.getOps(), storageReport.getStartTime());
+	private List<Alteration> buildAlterations(Date start, Date end, String type) {
+		List<Alteration> results = new LinkedList<Alteration>();
+
+		try {
+			List<Alteration> alterations = m_alterationDao.findByTypeDruation(start, end, type,	AlterationEntity.READSET_FULL);
+
+			for (Alteration alteration : alterations) {
+				results.add(alteration);
+			}
+		} catch (DalNotFoundException e) {
+			// ignore it
+		} catch (Exception e) {
+			Cat.logError(e);
+		}
+		return results;
+	}
+
+	private void buildDepartments(Payload payload, Model model, StorageReport storageReport) {
+		Map<String, Department> departments = m_storageGroupConfigManager
+								.queryStorageDepartments(SortHelper.sortDomain(storageReport.getIds()), payload.getType());
+
+		model.setDepartments(departments);
+	}
+
+	private void buildLineCharts(Model model, Payload payload, StorageReport storageReport) {
+		HourlyLineChartVisitor visitor = new HourlyLineChartVisitor(payload.getIpAddress(), payload.getProject(),
+								storageReport.getOps(), storageReport.getStartTime());
 
 		visitor.visitStorageReport(storageReport);
 		Map<String, LineChart> lineCharts = visitor.getLineChart();
@@ -137,35 +200,31 @@ public class Handler implements PageHandler<Context> {
 		return StringUtils.join(ops, ";");
 	}
 
-	private StorageReport buildReport(Payload payload, Model model, StorageReport storageReport) {
+	private void buildPieCharts(Model model, Payload payload, StorageReport report) {
+		PieChartVisitor visitor = new PieChartVisitor();
+
+		visitor.visitStorageReport(report);
+		model.setDistributionChart(visitor.getPiechartJson());
+	}
+
+	private String buildReportId(Payload payload) {
+		return payload.getId() + "-" + payload.getType();
+	}
+
+	private StorageReport filterReport(Payload payload, Model model, StorageReport storageReport) {
 		if (storageReport != null) {
 			Set<String> allOps = storageReport.getOps();
 			model.setOperations(allOps);
 
 			Pair<Boolean, Set<String>> pair = buildOperations(payload, model, allOps);
-			storageReport = m_mergeHelper.mergeReport(storageReport, payload.getIpAddress(), Constants.ALL);
-
 			if (pair.getKey()) {
 				StorageOperationFilter filter = new StorageOperationFilter(pair.getValue());
 				filter.visitStorageReport(storageReport);
 
 				storageReport = filter.getStorageReport();
 			}
-			StorageSorter sorter = new StorageSorter(storageReport, payload.getSort());
-			storageReport = sorter.getSortedReport();
-
-			model.setReport(storageReport);
-
-			Map<String, Department> departments = m_storageGroupConfigManager.queryStorageDepartments(
-			      SortHelper.sortDomain(storageReport.getIds()), payload.getType());
-			model.setDepartments(departments);
-
 		}
 		return storageReport;
-	}
-
-	private String buildReportId(Payload payload) {
-		return payload.getId() + "-" + payload.getType();
 	}
 
 	@Override
@@ -180,33 +239,62 @@ public class Handler implements PageHandler<Context> {
 		Model model = new Model(ctx);
 		Payload payload = ctx.getPayload();
 		normalize(model, payload);
-		String ipAddress = payload.getIpAddress();
 		StorageReport storageReport = null;
+		StorageReport rawReport = null;
 
 		switch (payload.getAction()) {
 		case HOURLY_STORAGE:
 			storageReport = queryHourlyReport(payload);
+			model.setOriginalReport(storageReport);
 
-			buildReport(payload, model, storageReport);
+			rawReport = filterReport(payload, model, storageReport);
+			storageReport = mergeReport(payload, rawReport);
+
+			model.setReport(storageReport);
+			buildDepartments(payload, model, storageReport);
 			break;
 		case HOURLY_STORAGE_GRAPH:
 			storageReport = queryHourlyReport(payload);
-			storageReport = buildReport(payload, model, storageReport);
+			rawReport = filterReport(payload, model, storageReport);
 
-			buildLineCharts(model, payload, ipAddress, storageReport);
+			if (Constants.ALL.equals(payload.getIpAddress())) {
+				buildPieCharts(model, payload, rawReport);
+			}
+			storageReport = mergeReport(payload, rawReport);
+
+			model.setReport(storageReport);
+			buildLineCharts(model, payload, storageReport);
+			buildDepartments(payload, model, storageReport);
 			break;
 		case HISTORY_STORAGE:
 			storageReport = queryHistoryReport(payload);
+			model.setOriginalReport(storageReport);
 
-			buildReport(payload, model, storageReport);
+			rawReport = filterReport(payload, model, storageReport);
+			storageReport = mergeReport(payload, rawReport);
+
+			model.setReport(storageReport);
+			buildDepartments(payload, model, storageReport);
 			break;
 		case DASHBOARD:
-			Map<String, StorageAlertInfo> alertInfos = m_alertInfoManager.queryAlertInfos(payload, model);
+			int minuteCounts = payload.getMinuteCounts();
+			long time = payload.getDate();
+			long end = time + model.getMinute() * TimeHelper.ONE_MINUTE;
+			Date startDate = new Date(end - (minuteCounts - 1) * TimeHelper.ONE_MINUTE);
+			Date endDate = new Date(end);
+			String type = payload.getType();
 
-			model.setLinks(buildAlertLinks(alertInfos, payload.getType()));
+			List<Alert> alerts = m_alertService.query(new Date(startDate.getTime() + TimeHelper.ONE_MINUTE),
+									new Date(endDate.getTime() + TimeHelper.ONE_MINUTE), type);
+			Map<String, StorageAlertInfo> alertInfos = m_alertInfoBuilder
+									.buildStorageAlertInfos(startDate, endDate,	minuteCounts, type, alerts);
+			alertInfos = sortAlertInfos(alertInfos);
+
+			model.setLinks(buildAlertLinks(alertInfos, type));
 			model.setAlertInfos(alertInfos);
-			model.setReportStart(new Date(payload.getDate()));
-			model.setReportEnd(new Date(payload.getDate() + TimeHelper.ONE_HOUR - 1));
+			model.setReportStart(new Date(time));
+			model.setReportEnd(new Date(time + TimeHelper.ONE_HOUR - 1));
+			model.setAlterations(buildAlterations(startDate, endDate, type));
 			break;
 		}
 
@@ -217,8 +305,16 @@ public class Handler implements PageHandler<Context> {
 		}
 	}
 
+	private StorageReport mergeReport(Payload payload, StorageReport storageReport) {
+		storageReport = m_mergeHelper.mergeReport(storageReport, payload.getIpAddress(), Constants.ALL);
+		StorageSorter sorter = new StorageSorter(storageReport, payload.getSort());
+
+		return sorter.getSortedReport();
+	}
+
 	private void normalize(Model model, Payload payload) {
 		model.setPage(ReportPage.STORAGE);
+		model.setAction(payload.getAction());
 		m_normalizePayload.normalize(model, payload);
 
 		if (payload.getAction() == Action.DASHBOARD) {
@@ -238,14 +334,7 @@ public class Handler implements PageHandler<Context> {
 			model.setMinutes(minutes);
 		} else {
 			if (payload.getOperations() == null) {
-				String type = payload.getType();
-				List<String> defaultMethods = new ArrayList<String>();
-
-				if (StorageConstants.CACHE_TYPE.equals(type)) {
-					defaultMethods = StorageConstants.CACHE_METHODS;
-				} else if (StorageConstants.SQL_TYPE.equals(type)) {
-					defaultMethods = StorageConstants.SQL_METHODS;
-				}
+				List<String> defaultMethods = m_storageBuilderManager.getDefaultMethods(payload.getType());
 
 				payload.setOperations(buildOperationStr(defaultMethods));
 			}
@@ -274,8 +363,8 @@ public class Handler implements PageHandler<Context> {
 	}
 
 	private StorageReport queryHourlyReport(Payload payload) {
-		ModelRequest request = new ModelRequest(buildReportId(payload), payload.getDate()).setProperty("ip",
-		      payload.getIpAddress());
+		ModelRequest request = new ModelRequest(buildReportId(payload), payload.getDate())
+								.setProperty("ip",	payload.getIpAddress());
 
 		if (m_service.isEligable(request)) {
 			ModelResponse<StorageReport> response = m_service.invoke(request);
@@ -286,4 +375,88 @@ public class Handler implements PageHandler<Context> {
 			throw new RuntimeException("Internal error: no eligable transaction service registered for " + request + "!");
 		}
 	}
+
+	public Map<String, StorageAlertInfo> sortAlertInfos(Map<String, StorageAlertInfo> alertInfos) {
+		Map<String, StorageAlertInfo> results = new LinkedHashMap<String, StorageAlertInfo>();
+
+		for (Entry<String, StorageAlertInfo> entry : alertInfos.entrySet()) {
+			StorageAlertInfo alertInfo = entry.getValue();
+			List<Entry<String, Storage>> entries = new ArrayList<Entry<String, Storage>>(alertInfo.getStorages().entrySet());
+			Collections.sort(entries, new Comparator<Map.Entry<String, Storage>>() {
+				@Override
+				public int compare(Map.Entry<String, Storage> o1, Map.Entry<String, Storage> o2) {
+					int gap = o2.getValue().getLevel() - o1.getValue().getLevel();
+
+					return gap == 0 ? o2.getValue().getCount() - o1.getValue().getCount() : gap;
+				}
+			});
+
+			StorageAlertInfo result = m_alertInfoBuilder.makeAlertInfo(alertInfo.getId(), alertInfo.getStartTime());
+			Map<String, Storage> storages = result.getStorages();
+
+			for (Entry<String, Storage> storage : entries) {
+				storages.put(storage.getKey(), storage.getValue());
+			}
+			results.put(entry.getKey(), result);
+		}
+
+		return SortHelper.sortMap(results, new MinuteComparator());
+	}
+
+	public static class MinuteComparator implements Comparator<Map.Entry<String, StorageAlertInfo>> {
+
+		@Override
+		public int compare(Map.Entry<String, StorageAlertInfo> o1, Map.Entry<String, StorageAlertInfo> o2) {
+			String key1 = o1.getKey();
+			String key2 = o2.getKey();
+			String hour1 = key1.substring(0, 2);
+			String hour2 = key2.substring(0, 2);
+
+			if (!hour1.equals(hour2)) {
+				int hour1Value = Integer.parseInt(hour1);
+				int hour2Value = Integer.parseInt(hour2);
+
+				if (hour1Value == 0 && hour2Value == 23) {
+					return -1;
+				} else if (hour1Value == 23 && hour2Value == 0) {
+					return 1;
+				} else {
+					return hour2Value - hour1Value;
+				}
+			} else {
+				String first = key1.substring(3, 5);
+				String end = key2.substring(3, 5);
+
+				return Integer.parseInt(end) - Integer.parseInt(first);
+			}
+		}
+	}
+
+	public static class StringCompartor implements Comparator<String> {
+
+		@Override
+		public int compare(String o1, String o2) {
+			String hour1 = o1.substring(0, 2);
+			String hour2 = o2.substring(0, 2);
+
+			if (!hour1.equals(hour2)) {
+				int hour1Value = Integer.parseInt(hour1);
+				int hour2Value = Integer.parseInt(hour2);
+
+				if (hour1Value == 0 && hour2Value == 23) {
+					return -1;
+				} else if (hour1Value == 23 && hour2Value == 0) {
+					return 1;
+				} else {
+					return hour2Value - hour1Value;
+				}
+			} else {
+				String first = o1.substring(3, 5);
+				String end = o2.substring(3, 5);
+
+				return Integer.parseInt(end) - Integer.parseInt(first);
+			}
+		}
+	}
+
 }

@@ -1,3 +1,21 @@
+/*
+ * Copyright (c) 2011-2018, Meituan Dianping. All Rights Reserved.
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.dianping.cat.report.alert.exception;
 
 import java.util.ArrayList;
@@ -7,21 +25,18 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import org.unidal.lookup.annotation.Inject;
+import org.unidal.lookup.annotation.Named;
 import org.unidal.tuple.Pair;
 
-import com.dianping.cat.config.aggregation.AggregationConfigManager;
-import com.dianping.cat.configuration.aggreation.model.entity.AggregationRule;
+import com.dianping.cat.alarm.spi.AlertLevel;
 import com.dianping.cat.home.exception.entity.ExceptionLimit;
 import com.dianping.cat.report.page.dependency.TopMetric.Item;
-import com.dianping.cat.report.alert.AlertLevel;
 
+@Named
 public class AlertExceptionBuilder {
 
 	@Inject
 	private ExceptionRuleConfigManager m_exceptionConfigManager;
-
-	@Inject
-	private AggregationConfigManager m_aggregationConfigManager;
 
 	public Map<String, List<AlertException>> buildAlertExceptions(List<Item> items) {
 		Map<String, List<AlertException>> alertExceptions = new LinkedHashMap<String, List<AlertException>>();
@@ -40,50 +55,34 @@ public class AlertExceptionBuilder {
 		String domain = item.getDomain();
 		List<AlertException> alertExceptions = new ArrayList<AlertException>();
 		Pair<Double, Double> totalLimitPair = queryDomainTotalLimit(domain);
-		double totalWarnLimit = totalLimitPair.getKey();
-		double totalErrorLimit = totalLimitPair.getValue();
 		double totalException = 0;
 
 		for (Entry<String, Double> entry : item.getException().entrySet()) {
 			String exceptionName = entry.getKey();
 			double value = entry.getValue().doubleValue();
 			Pair<Double, Double> limitPair = queryDomainExceptionLimit(domain, exceptionName);
-			double warnLimit = limitPair.getKey();
-			double errorLimit = limitPair.getValue();
 			totalException += value;
 
-			if (errorLimit > 0 && value >= errorLimit) {
-				alertExceptions.add(new AlertException(exceptionName, AlertLevel.ERROR, value));
-			} else if (warnLimit > 0 && value >= warnLimit) {
-				alertExceptions.add(new AlertException(exceptionName, AlertLevel.WARNING, value));
+			//非Total告警开关
+			if (null != limitPair) {
+				double warnLimit = limitPair.getKey();
+				double errorLimit = limitPair.getValue();
+				if (errorLimit > 0 && value >= errorLimit) {
+					alertExceptions.add(new AlertException(exceptionName, AlertLevel.ERROR, value));
+				} else if (warnLimit > 0 && value >= warnLimit) {
+					alertExceptions.add(new AlertException(exceptionName, AlertLevel.WARNING, value));
+				}
 			}
 		}
 
-		if (totalErrorLimit > 0 && totalException >= totalErrorLimit) {
-			alertExceptions.add(new AlertException(ExceptionRuleConfigManager.TOTAL_STRING, AlertLevel.ERROR,
-			      totalException));
-		} else if (totalWarnLimit > 0 && totalException >= totalWarnLimit) {
-			alertExceptions.add(new AlertException(ExceptionRuleConfigManager.TOTAL_STRING, AlertLevel.WARNING,
-			      totalException));
-		}
-
-		return alertExceptions;
-	}
-
-	public List<AlertException> buildFrontEndAlertExceptions(Item frontEndItem) {
-		List<AlertException> alertExceptions = new ArrayList<AlertException>();
-
-		for (Entry<String, Double> entry : frontEndItem.getException().entrySet()) {
-			String exception = entry.getKey();
-			AggregationRule rule = m_aggregationConfigManager.queryAggration(exception);
-
-			if (rule != null) {
-				int warn = rule.getWarn();
-				double value = entry.getValue().doubleValue();
-
-				if (value >= warn) {
-					alertExceptions.add(new AlertException(exception, AlertLevel.WARNING, value));
-				}
+		//Total告警开关
+		if (null != totalLimitPair) {
+			double totalWarnLimit = totalLimitPair.getKey();
+			double totalErrorLimit = totalLimitPair.getValue();
+			if (totalErrorLimit > 0 && totalException >= totalErrorLimit) {
+				alertExceptions.add(new AlertException(ExceptionRuleConfigManager.TOTAL_STRING, AlertLevel.ERROR, totalException));
+			} else if (totalWarnLimit > 0 && totalException >= totalWarnLimit) {
+				alertExceptions.add(new AlertException(ExceptionRuleConfigManager.TOTAL_STRING, AlertLevel.WARNING, totalException));
 			}
 		}
 		return alertExceptions;
@@ -96,6 +95,10 @@ public class AlertExceptionBuilder {
 		double errorLimit = -1;
 
 		if (exceptionLimit != null) {
+			//告警开关
+			if (null != exceptionLimit.getAvailable() && !exceptionLimit.getAvailable()) {
+				return null;
+			}
 			warnLimit = exceptionLimit.getWarning();
 			errorLimit = exceptionLimit.getError();
 		}
@@ -112,6 +115,10 @@ public class AlertExceptionBuilder {
 		double totalErrorLimit = -1;
 
 		if (totalExceptionLimit != null) {
+			//告警开关
+			if (null != totalExceptionLimit.getAvailable() && !totalExceptionLimit.getAvailable()) {
+				return null;
+			}
 			totalWarnLimit = totalExceptionLimit.getWarning();
 			totalErrorLimit = totalExceptionLimit.getError();
 		}
@@ -125,11 +132,11 @@ public class AlertExceptionBuilder {
 
 		private String m_name;
 
-		private String m_type;
+		private AlertLevel m_type;
 
 		private double m_count;
 
-		public AlertException(String name, String type, double count) {
+		public AlertException(String name, AlertLevel type, double count) {
 			m_name = name;
 			m_type = type;
 			m_count = count;
@@ -139,7 +146,7 @@ public class AlertExceptionBuilder {
 			return m_name;
 		}
 
-		public String getType() {
+		public AlertLevel getType() {
 			return m_type;
 		}
 

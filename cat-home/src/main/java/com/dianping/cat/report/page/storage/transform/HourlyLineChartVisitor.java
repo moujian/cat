@@ -1,3 +1,21 @@
+/*
+ * Copyright (c) 2011-2018, Meituan Dianping. All Rights Reserved.
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.dianping.cat.report.page.storage.transform;
 
 import java.util.Date;
@@ -13,12 +31,15 @@ import com.dianping.cat.consumer.storage.model.entity.Domain;
 import com.dianping.cat.consumer.storage.model.entity.Machine;
 import com.dianping.cat.consumer.storage.model.entity.Operation;
 import com.dianping.cat.consumer.storage.model.entity.Segment;
+import com.dianping.cat.consumer.storage.model.entity.StorageReport;
 import com.dianping.cat.consumer.storage.model.transform.BaseVisitor;
 import com.dianping.cat.helper.TimeHelper;
 import com.dianping.cat.report.graph.LineChart;
 import com.dianping.cat.report.page.storage.StorageConstants;
 
 public class HourlyLineChartVisitor extends BaseVisitor {
+
+	private static final int SIZE = 60;
 
 	private String m_ip;
 
@@ -28,10 +49,6 @@ public class HourlyLineChartVisitor extends BaseVisitor {
 
 	private Map<String, LineChartData> m_datas = new LinkedHashMap<String, LineChartData>();
 
-	private static final int SIZE = 60;
-
-	private Set<String> m_operations;
-
 	private String m_domain;
 
 	private String m_currentOperation;
@@ -39,23 +56,7 @@ public class HourlyLineChartVisitor extends BaseVisitor {
 	public HourlyLineChartVisitor(String ip, String domain, Set<String> operations, Date start) {
 		m_ip = ip;
 		m_domain = domain;
-		m_operations = operations;
-		m_start = start;
 
-		for (String title : StorageConstants.TITLES) {
-			LineChart linechart = new LineChart();
-
-			linechart.setSize(SIZE);
-			linechart.setStep(TimeHelper.ONE_MINUTE);
-			linechart.setStart(start);
-			m_lineCharts.put(title, linechart);
-		}
-
-		for (String operation : operations) {
-			LineChartData data = new LineChartData(operation);
-
-			m_datas.put(operation, data);
-		}
 	}
 
 	private Map<Integer, Double> buildAvgData(Map<Integer, Double> counts, Map<Integer, Double> sums) {
@@ -128,11 +129,8 @@ public class HourlyLineChartVisitor extends BaseVisitor {
 
 	@Override
 	public void visitOperation(Operation operation) {
-		if (m_operations.contains(operation.getId())) {
-			m_currentOperation = operation.getId();
-
-			super.visitOperation(operation);
-		}
+		m_currentOperation = operation.getId();
+		super.visitOperation(operation);
 	}
 
 	@Override
@@ -144,6 +142,27 @@ public class HourlyLineChartVisitor extends BaseVisitor {
 		data.incSums(minute, segment.getSum());
 		data.incErrors(minute, segment.getError());
 		data.incLongs(minute, segment.getLongCount());
+	}
+
+	@Override
+	public void visitStorageReport(StorageReport storageReport) {
+		m_start = storageReport.getStartTime();
+
+		for (String title : StorageConstants.TITLES) {
+			LineChart linechart = new LineChart();
+
+			linechart.setSize(SIZE);
+			linechart.setStep(TimeHelper.ONE_MINUTE);
+			linechart.setStart(m_start);
+			m_lineCharts.put(title, linechart);
+		}
+
+		for (String operation : storageReport.getOps()) {
+			LineChartData data = new LineChartData(operation);
+
+			m_datas.put(operation, data);
+		}
+		super.visitStorageReport(storageReport);
 	}
 
 	public static class LineChartData {

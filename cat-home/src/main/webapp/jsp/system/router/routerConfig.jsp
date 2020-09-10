@@ -6,28 +6,55 @@
 <jsp:useBean id="ctx" type="com.dianping.cat.system.page.config.Context" scope="request"/>
 <jsp:useBean id="payload" type="com.dianping.cat.system.page.config.Payload" scope="request"/>
 <jsp:useBean id="model" type="com.dianping.cat.system.page.config.Model" scope="request"/>
+
 <a:config>
 	<res:useJs value="${res.js.local['jquery.validate.min.js']}" target="head-js" />
-	<res:useJs value="${res.js.local['dependencyConfig.js']}" target="head-js" />
-	<res:useJs value="${res.js.local['alarm_js']}" target="head-js" />
-	<res:useCss value="${res.css.local['select2.css']}" target="head-css" />
-	<res:useJs value="${res.js.local['select2.min.js']}" target="head-js" />
+	<res:useJs value="${res.js.local['editor.js']}" target="head-js" />
+	<script src='${model.webapp}/assets/js/editor/ace.js'></script>
 
 			<form name="routerConfigUpdate" id="form" method="post"
 				action="${model.pageUri}?op=routerConfigUpdate">
-				<table class="table table-striped table-condensed   table-hover">
-					<tr>
-						<td><textarea name="content" style="width:100%" rows="20" cols="150">${model.content}</textarea></td>
-					</tr>
+				<table class="table table-striped table-condensed  table-hover">
+					<tr><td>
+					<input id="content" name="content" value="" type="hidden"/>
+					<div id="editor" class="editor">${model.content}</div>
+					</td></tr>
 					<tr>
 						<td  style="text-align:center"><input class='btn btn-primary' id="addOrUpdateEdgeSubmit"
-							type="submit" name="submit" value="提交" /></td>
+							type="submit" name="submit" value="提交" /> &nbsp; &nbsp;&nbsp;&nbsp;
+							<a href="/cat/s/router?op=build" class='btn btn-primary' id="routerRebuild" target="_blank">重算路由</a></td>
 					</tr>
 				</table>
 			</form>
 			<h4 class="text-center text-danger" id="state">&nbsp;</h4>
 </a:config>
 <script type="text/javascript">
+		$("#routerRebuild").on('click', function(e) {
+			e.preventDefault();
+			var anchor = this;
+			var dialog = $( "#rebuild-router-message" ).removeClass('hide').dialog({
+				modal: true,
+				title: "<div class='widget-header widget-header-small'><h4 class='smaller'><i class='ace-icon fa fa-check'></i>CAT提示</h4></div>",
+				title_html: true,
+				buttons: [ 
+					{
+						text: "Cancel",
+						"class" : "btn btn-xs",
+						click: function() {
+							$( this ).dialog( "close" ); 
+						} 
+					},
+					{
+						text: "OK",
+						"class" : "btn btn-primary btn-xs",
+						click: function() {
+							$( this ).dialog( "close" ); 
+							window.open(anchor.href);
+						} 
+					}
+				]
+			});
+		});
 		$(document).ready(function() {
 			$('#overall_config').addClass('active open');
 			$('#routerConfigUpdate').addClass('active');

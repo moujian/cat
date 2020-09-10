@@ -1,16 +1,30 @@
+/*
+ * Copyright (c) 2011-2018, Meituan Dianping. All Rights Reserved.
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.dianping.cat.report.page.top;
 
 import org.unidal.web.mvc.ActionContext;
 import org.unidal.web.mvc.payload.annotation.FieldMeta;
 
+import com.dianping.cat.mvc.AbstractReportPayload;
 import com.dianping.cat.report.ReportPage;
-import com.dianping.cat.report.page.AbstractReportPayload;
 
-public class Payload extends AbstractReportPayload<Action> {
-	public Payload() {
-		super(ReportPage.TOP);
-	}
-
+public class Payload extends AbstractReportPayload<Action, ReportPage> {
 	private ReportPage m_page;
 
 	@FieldMeta("op")
@@ -34,6 +48,37 @@ public class Payload extends AbstractReportPayload<Action> {
 	@FieldMeta("fullScreen")
 	private boolean m_fullScreen = false;
 
+	@FieldMeta("domain")
+	private String m_domain;
+
+	@FieldMeta("ip")
+	private String m_ip;
+
+	public Payload() {
+		super(ReportPage.TOP);
+	}
+
+	@Override
+	public Action getAction() {
+		return m_action;
+	}
+
+	public void setAction(String action) {
+		m_action = Action.getByName(action, Action.VIEW);
+	}
+
+	public long getCurrentTimeMillis() {
+		return System.currentTimeMillis();
+	}
+
+	public int getFrequency() {
+		return m_frequency;
+	}
+
+	public void setFrequency(int frequency) {
+		m_frequency = frequency;
+	}
+
 	public String getMinute() {
 		return m_minute;
 	}
@@ -50,12 +95,14 @@ public class Payload extends AbstractReportPayload<Action> {
 		m_minuteCounts = minuteCounts;
 	}
 
-	public int getFrequency() {
-		return m_frequency;
+	@Override
+	public ReportPage getPage() {
+		return m_page;
 	}
 
-	public void setFrequency(int frequency) {
-		m_frequency = frequency;
+	@Override
+	public void setPage(String page) {
+		m_page = ReportPage.getByName(page, ReportPage.TOP);
 	}
 
 	public int getTopCounts() {
@@ -66,14 +113,6 @@ public class Payload extends AbstractReportPayload<Action> {
 		m_topCounts = topCounts;
 	}
 
-	public boolean isRefresh() {
-		return m_refresh;
-	}
-
-	public void setRefresh(boolean refresh) {
-		m_refresh = refresh;
-	}
-
 	public boolean isFullScreen() {
 		return m_fullScreen;
 	}
@@ -82,27 +121,28 @@ public class Payload extends AbstractReportPayload<Action> {
 		m_fullScreen = fullScreen;
 	}
 
-	public long getCurrentTimeMillis() {
-		return System.currentTimeMillis();
+	public boolean isRefresh() {
+		return m_refresh;
 	}
 
-	public void setAction(String action) {
-		m_action = Action.getByName(action, Action.VIEW);
+	public void setRefresh(boolean refresh) {
+		m_refresh = refresh;
 	}
 
-	@Override
-	public Action getAction() {
-		return m_action;
+	public String getDomain() {
+		return m_domain;
 	}
 
-	@Override
-	public ReportPage getPage() {
-		return m_page;
+	public void setDomain(String domain) {
+		m_domain = domain;
 	}
 
-	@Override
-	public void setPage(String page) {
-		m_page = ReportPage.getByName(page, ReportPage.TOP);
+	public String getIp() {
+		return m_ip;
+	}
+
+	public void setIp(String ip) {
+		m_ip = ip;
 	}
 
 	@Override

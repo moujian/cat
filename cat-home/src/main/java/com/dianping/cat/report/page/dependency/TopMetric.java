@@ -1,3 +1,21 @@
+/*
+ * Copyright (c) 2011-2018, Meituan Dianping. All Rights Reserved.
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.dianping.cat.report.page.dependency;
 
 import java.text.SimpleDateFormat;
@@ -22,19 +40,19 @@ import com.dianping.cat.report.alert.exception.ExceptionRuleConfigManager;
 
 public class TopMetric extends BaseVisitor {
 
-	private ExceptionRuleConfigManager m_configManager;
+	private transient ExceptionRuleConfigManager m_configManager;
 
-	private List<String> m_excludedDomains;
+	private transient List<String> m_excludedDomains;
 
-	private String m_currentDomain;
+	private transient String m_currentDomain;
 
-	private Date m_currentStart;
+	private transient Date m_currentStart;
 
-	private SimpleDateFormat m_sdf = new SimpleDateFormat("HH:mm");
+	private transient SimpleDateFormat m_sdf = new SimpleDateFormat("HH:mm");
 
 	private MetricItem m_error;
 
-	private long m_currentTime = System.currentTimeMillis();
+	private transient long m_currentTime = System.currentTimeMillis();
 
 	private Integer m_currentMinute;
 
@@ -44,7 +62,7 @@ public class TopMetric extends BaseVisitor {
 
 	public TopMetric(int count, int tops, ExceptionRuleConfigManager configManager) {
 		m_configManager = configManager;
-		m_error = new MetricItem(count, tops, m_configManager);
+		m_error = new MetricItem(count, tops);
 	}
 
 	public TopMetric(int count, int tops, ExceptionRuleConfigManager configManager, List<String> excludedDomains) {
@@ -56,13 +74,13 @@ public class TopMetric extends BaseVisitor {
 		return m_error;
 	}
 
+	public void setError(MetricItem error) {
+		m_error = error;
+	}
+
 	public TopMetric setEnd(Date end) {
 		m_end = end;
 		return this;
-	}
-
-	public void setError(MetricItem error) {
-		m_error = error;
 	}
 
 	public TopMetric setStart(Date start) {
@@ -117,7 +135,51 @@ public class TopMetric extends BaseVisitor {
 		m_error.buildDisplayResult();
 	}
 
-	public static class Item {
+	public static class ItemCompartor implements Comparator<Item> {
+
+		@Override
+		public int compare(Item o1, Item o2) {
+			int alert = 0;
+
+			if (o2.getAlert() > o1.getAlert()) {
+				alert = 1;
+			} else if (o2.getAlert() < o1.getAlert()) {
+				alert = -1;
+			}
+			int value = Double.compare(o2.getValue(), o1.getValue());
+
+			return alert == 0 ? value : alert;
+		}
+	}
+
+	public static class StringCompartor implements Comparator<String> {
+
+		@Override
+		public int compare(String o1, String o2) {
+			String hour1 = o1.substring(0, 2);
+			String hour2 = o2.substring(0, 2);
+
+			if (!hour1.equals(hour2)) {
+				int hour1Value = Integer.parseInt(hour1);
+				int hour2Value = Integer.parseInt(hour2);
+
+				if (hour1Value == 0 && hour2Value == 23) {
+					return -1;
+				} else if (hour1Value == 23 && hour2Value == 0) {
+					return 1;
+				} else {
+					return hour2Value - hour1Value;
+				}
+			} else {
+				String first = o1.substring(3, 5);
+				String end = o2.substring(3, 5);
+
+				return Integer.parseInt(end) - Integer.parseInt(first);
+			}
+		}
+	}
+
+	public class Item {
 
 		private static final String ERROR_COLOR = "red";
 
@@ -129,14 +191,11 @@ public class TopMetric extends BaseVisitor {
 
 		private int m_alert;
 
-		private ExceptionRuleConfigManager m_configManager;
-
 		private Map<String, Double> m_exceptions = new HashMap<String, Double>();
 
-		public Item(String domain, double value, ExceptionRuleConfigManager configManager) {
+		public Item(String domain, double value) {
 			m_domain = domain;
 			m_value = value;
-			m_configManager = configManager;
 		}
 
 		private String buildErrorText(String str, String color) {
@@ -153,6 +212,10 @@ public class TopMetric extends BaseVisitor {
 
 		public String getDomain() {
 			return m_domain;
+		}
+
+		public void setDomain(String domain) {
+			m_domain = domain;
 		}
 
 		public String getErrorInfo() {
@@ -191,14 +254,6 @@ public class TopMetric extends BaseVisitor {
 			return m_value;
 		}
 
-		public void setDomain(String domain) {
-			m_domain = domain;
-		}
-
-		public void setExceptions(Map<String, Double> exceptions) {
-			m_exceptions = exceptions;
-		}
-
 		public void setValue(double value) {
 			m_value = value;
 			double warningLimit = -1;
@@ -218,45 +273,24 @@ public class TopMetric extends BaseVisitor {
 				m_alert = 1;
 			}
 		}
-	}
 
-	public static class ItemCompartor implements Comparator<Item> {
-
-		@Override
-		public int compare(Item o1, Item o2) {
-			int alert = 0;
-
-			if (o2.getAlert() > o1.getAlert()) {
-				alert = 1;
-			} else if (o2.getAlert() < o1.getAlert()) {
-				alert = -1;
-			}
-			int value = Double.compare(o2.getValue(), o1.getValue());
-
-			return alert == 0 ? value : alert;
+		public void setExceptions(Map<String, Double> exceptions) {
+			m_exceptions = exceptions;
 		}
 	}
 
-	public static class MetricItem {
+	public class MetricItem {
 		private int m_minuteCount;
 
 		private int m_itemSize;
 
-		private Map<String, Map<String, Item>> m_items = new LinkedHashMap<String, Map<String, Item>>();
+		private transient Map<String, Map<String, Item>> m_items = new LinkedHashMap<String, Map<String, Item>>();
 
 		private Map<String, List<Item>> m_result;
-
-		private ExceptionRuleConfigManager m_configManager;
 
 		public MetricItem(int minuteCount, int itemSize) {
 			m_minuteCount = minuteCount;
 			m_itemSize = itemSize;
-		}
-
-		public MetricItem(int minuteCount, int itemSize, ExceptionRuleConfigManager configManager) {
-			m_minuteCount = minuteCount;
-			m_itemSize = itemSize;
-			m_configManager = configManager;
 		}
 
 		public void addError(String minute, String domain, String exception, long count) {
@@ -311,7 +345,7 @@ public class TopMetric extends BaseVisitor {
 			Item item = temp.get(domain);
 
 			if (item == null) {
-				item = new Item(domain, 0, m_configManager);
+				item = new Item(domain, 0);
 				temp.put(domain, item);
 			}
 
@@ -320,33 +354,6 @@ public class TopMetric extends BaseVisitor {
 
 		public Map<String, List<Item>> getResult() {
 			return m_result;
-		}
-	}
-
-	public static class StringCompartor implements Comparator<String> {
-
-		@Override
-		public int compare(String o1, String o2) {
-			String hour1 = o1.substring(0, 2);
-			String hour2 = o2.substring(0, 2);
-
-			if (!hour1.equals(hour2)) {
-				int hour1Value = Integer.parseInt(hour1);
-				int hour2Value = Integer.parseInt(hour2);
-
-				if (hour1Value == 0 && hour2Value == 23) {
-					return -1;
-				} else if (hour1Value == 23 && hour2Value == 0) {
-					return 1;
-				} else {
-					return hour2Value - hour1Value;
-				}
-			} else {
-				String first = o1.substring(3, 5);
-				String end = o2.substring(3, 5);
-
-				return Integer.parseInt(end) - Integer.parseInt(first);
-			}
 		}
 	}
 }

@@ -1,3 +1,21 @@
+/*
+ * Copyright (c) 2011-2018, Meituan Dianping. All Rights Reserved.
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.dianping.cat.system.page.config.processor;
 
 import java.util.ArrayList;
@@ -10,15 +28,19 @@ import org.unidal.lookup.util.StringUtils;
 
 import com.dianping.cat.Cat;
 import com.dianping.cat.Constants;
-import com.dianping.cat.config.black.BlackListManager;
+import com.dianping.cat.alarm.spi.config.SenderConfigManager;
+import com.dianping.cat.config.ReportReloadConfigManager;
+import com.dianping.cat.config.sample.SampleConfigManager;
+import com.dianping.cat.config.server.ServerConfigManager;
+import com.dianping.cat.config.server.ServerFilterConfigManager;
+import com.dianping.cat.consumer.config.AllReportConfigManager;
 import com.dianping.cat.core.dal.Project;
 import com.dianping.cat.home.group.entity.Domain;
-import com.dianping.cat.report.alert.sender.config.SenderConfigManager;
 import com.dianping.cat.report.page.DomainGroupConfigManager;
-import com.dianping.cat.report.page.statistics.config.BugConfigManager;
 import com.dianping.cat.report.page.storage.config.StorageGroupConfigManager;
 import com.dianping.cat.service.ProjectService;
 import com.dianping.cat.system.page.config.Action;
+import com.dianping.cat.system.page.config.ConfigHtmlParser;
 import com.dianping.cat.system.page.config.Model;
 import com.dianping.cat.system.page.config.Payload;
 import com.dianping.cat.system.page.router.config.RouterConfigManager;
@@ -27,9 +49,6 @@ public class GlobalConfigProcessor {
 
 	@Inject
 	public ProjectService m_projectService;
-
-	@Inject
-	private BugConfigManager m_bugConfigManager;
 
 	@Inject
 	private RouterConfigManager m_routerConfigManager;
@@ -41,10 +60,25 @@ public class GlobalConfigProcessor {
 	private SenderConfigManager m_senderConfigManager;
 
 	@Inject
-	private BlackListManager m_blackListManager;
+	private StorageGroupConfigManager m_groupConfigManager;
 
 	@Inject
-	private StorageGroupConfigManager m_groupConfigManager;
+	private ServerFilterConfigManager m_serverFilterConfigManager;
+
+	@Inject
+	private AllReportConfigManager m_transactionConfigManager;
+
+	@Inject
+	private ConfigHtmlParser m_configHtmlParser;
+
+	@Inject
+	private SampleConfigManager m_sampleConfigManager;
+
+	@Inject
+	private ServerConfigManager m_serverConfigManager;
+
+	@Inject
+	private ReportReloadConfigManager m_reloadConfigManager;
 
 	private boolean deleteProject(Payload payload) {
 		Project proto = new Project();
@@ -65,6 +99,8 @@ public class GlobalConfigProcessor {
 			}
 			model.setProjects(queryAllProjects());
 			model.setProject(m_projectService.findByDomain(domain));
+			break;
+		case PROJECT_ADD:
 			break;
 		case PROJECT_UPDATE_SUBMIT:
 			model.setOpState(updateProject(payload));
@@ -107,49 +143,72 @@ public class GlobalConfigProcessor {
 			m_domainGroupConfigManger.insertFromJson(payload.getContent());
 			model.setDomainGroup(m_domainGroupConfigManger.getDomainGroup());
 			break;
-		case BUG_CONFIG_UPDATE:
-			String xml = payload.getBug();
-			if (!StringUtils.isEmpty(xml)) {
-				model.setOpState(m_bugConfigManager.insert(xml));
-			} else {
-				model.setOpState(true);
-			}
-			model.setBug(m_bugConfigManager.getBugConfig().toString());
-			break;
 		case ROUTER_CONFIG_UPDATE:
 			String routerConfig = payload.getContent();
+
 			if (!StringUtils.isEmpty(routerConfig)) {
 				model.setOpState(m_routerConfigManager.insert(routerConfig));
 			}
-			model.setContent(m_routerConfigManager.getRouterConfig().toString());
+			model.setContent(m_configHtmlParser.parse(m_routerConfigManager.getRouterConfig().toString()));
 			break;
 		case ALERT_SENDER_CONFIG_UPDATE:
 			String senderConfig = payload.getContent();
+
 			if (!StringUtils.isEmpty(senderConfig)) {
 				model.setOpState(m_senderConfigManager.insert(senderConfig));
 			}
-			model.setContent(m_senderConfigManager.getConfig().toString());
-			break;
-		case BLACK_CONFIG_UPDATE:
-			String blackConfig = payload.getContent();
-
-			if (!StringUtils.isEmpty(blackConfig)) {
-				model.setOpState(m_blackListManager.insert(blackConfig));
-			} else {
-				model.setOpState(true);
-			}
-			model.setContent(m_blackListManager.getBlackList().toString());
+			model.setContent(m_configHtmlParser.parse(m_senderConfigManager.getConfig().toString()));
 			break;
 		case STORAGE_GROUP_CONFIG_UPDATE:
 			String storageGroup = payload.getContent();
+
 			if (!StringUtils.isEmpty(storageGroup)) {
 				model.setOpState(m_groupConfigManager.insert(storageGroup));
 			}
-			model.setContent(m_groupConfigManager.getConfig().toString());
+			model.setContent(m_configHtmlParser.parse(m_groupConfigManager.getConfig().toString()));
+			break;
+		case SERVER_FILTER_CONFIG_UPDATE:
+			String serverConfig = payload.getContent();
+
+			if (!StringUtils.isEmpty(serverConfig)) {
+				model.setOpState(m_serverFilterConfigManager.insert(serverConfig));
+			}
+			model.setContent(m_configHtmlParser.parse(m_serverFilterConfigManager.getConfig().toString()));
+			break;
+		case ALL_REPORT_CONFIG:
+			String transactionConfig = payload.getContent();
+
+			if (!StringUtils.isEmpty(transactionConfig)) {
+				model.setOpState(m_transactionConfigManager.insert(transactionConfig));
+			}
+			model.setContent(m_configHtmlParser.parse(m_transactionConfigManager.getConfig().toString()));
+			break;
+		case SAMPLE_CONFIG_UPDATE:
+			String sampleConfig = payload.getContent();
+
+			if (!StringUtils.isEmpty(sampleConfig)) {
+				model.setOpState(m_sampleConfigManager.insert(sampleConfig));
+			}
+			model.setContent(m_configHtmlParser.parse(m_sampleConfigManager.getConfig().toString()));
+			break;
+		case SERVER_CONFIG_UPDATE:
+			serverConfig = payload.getContent();
+
+			if (!StringUtils.isEmpty(serverConfig)) {
+				model.setOpState(m_serverConfigManager.insert(serverConfig));
+			}
+			model.setContent(m_configHtmlParser.parse(m_serverConfigManager.getConfig().toString()));
+			break;
+		case REPORT_RELOAD_CONFIG_UPDATE:
+			String reportReloadConfig = payload.getContent();
+
+			if (!StringUtils.isEmpty(reportReloadConfig)) {
+				model.setOpState(m_reloadConfigManager.insert(reportReloadConfig));
+			}
+			model.setContent(m_configHtmlParser.parse(m_reloadConfigManager.getConfig().toString()));
 			break;
 		default:
-			System.out.println(action);
-			throw new RuntimeException("Error action name " + action.getName());
+			break;
 		}
 	}
 
@@ -178,9 +237,20 @@ public class GlobalConfigProcessor {
 
 	private boolean updateProject(Payload payload) {
 		Project project = payload.getProject();
-		project.setKeyId(project.getId());
+		String domain = project.getDomain();
 
-		return m_projectService.update(project);
+		if (StringUtils.isNotEmpty(domain)) {
+			int id = project.getId();
+			Project temp = m_projectService.findByDomain(domain);
+
+			if (temp != null && id > 0) {
+				temp.setKeyId(id);
+				return m_projectService.update(project);
+			} else {
+				return m_projectService.insert(project);
+			}
+		}
+		return false;
 	}
 
 	public static class ProjectCompartor implements Comparator<Project> {

@@ -16,7 +16,6 @@
 	<jsp:attribute name="subtitle">${w:format(report.startTime,'yyyy-MM-dd HH:mm:ss')} to ${w:format(report.endTime,'yyyy-MM-dd HH:mm:ss')}</jsp:attribute>
 
 	<jsp:body>
-	<res:useJs value="${res.js.local['baseGraph.js']}" target="head-js"/>
 <table class="machines">
 	<tr style="text-align:left"> 
 		<th>&nbsp;[&nbsp; <c:choose>
@@ -72,6 +71,9 @@
 			<c:if test="${payload.type eq 'Cache'}">
 				<th class="right"><a data-rel="tooltip" data-placement="left" title="一段时间内长时间(超过50ms)操作总量" href="?op=${payload.action.name}&type=${payload.type}&domain=${model.domain}&id=${payload.id}&ip=${model.ipAddress}&date=${model.date}&operations=${payload.operations}&sort=${item};long">Long</a></th>
 			</c:if>
+			<c:if test="${payload.type eq 'RPC'}">
+				<th class="right"><a data-rel="tooltip" data-placement="left" title="一段时间内长时间(超过100ms)操作总量" href="?op=${payload.action.name}&type=${payload.type}&domain=${model.domain}&id=${payload.id}&ip=${model.ipAddress}&date=${model.date}&operations=${payload.operations}&sort=${item};long">Long</a></th>
+			</c:if>
 			<th class="right"><a data-rel="tooltip" data-placement="left" title="一段时间内操作平均响应时间(ms)" href="?op=${payload.action.name}&type=${payload.type}&domain=${model.domain}&id=${payload.id}&ip=${model.ipAddress}&date=${model.date}&operations=${payload.operations}&sort=${item};avg">Avg</a></th>
 			<th class="right"><a data-rel="tooltip" data-placement="left" title="一段时间内错误操作总数" href="?op=${payload.action.name}&type=${payload.type}&domain=${model.domain}&id=${payload.id}&ip=${model.ipAddress}&date=${model.date}&operations=${payload.operations}&sort=${item};error">Error</a></th>
 		</c:forEach>
@@ -81,12 +83,29 @@
 		<tr>
 		<td><a href="?op=hourlyGraph&type=${payload.type}&domain=${model.domain}&date=${model.date}&id=${payload.id}&ip=${model.ipAddress}&project=${domain.key}${model.customDate}&operations=${payload.operations}" class="storage_graph_link" data-status="${domain.key}">[:: show ::]</a>
 		</td>
-		<td class="left">${domain.key}</td>
+		<td class="left">
+		<c:choose>
+			<c:when test="${domain.key eq 'All'}">${domain.key}</c:when>
+			<c:otherwise>
+				<a href="/cat/r/p?op=view&domain=${domain.key}&ip=All&date=${model.date}&reportType=day" target="_blank">${domain.key}</a>
+			</c:otherwise>
+		</c:choose>
+		
+		</td>
 		<c:forEach var="item" items="${model.currentOperations}">
 			<td class="right">${w:format(domain.value.operations[item].count,'#,###,###,###,##0')}</td>
 			<td class="right">${w:format(domain.value.operations[item].longCount,'#,###,###,###,##0')}</td>
 			<td class="right">${w:format(domain.value.operations[item].avg,'###,##0.0')}</td>
-			<td class="right">${w:format(domain.value.operations[item].error,'#,###,###,###,##0')}</td>
+			<td class="right">
+			<c:choose>
+			<c:when test="${domain.value.operations[item].error > 0}">
+				<span class="badge badge-danger">${w:format(domain.value.operations[item].error,'#,###,###,###,##0')}</span>
+			</c:when>
+			<c:otherwise>
+				${w:format(domain.value.operations[item].error,'#,###,###,###,##0')}
+			</c:otherwise>
+			</c:choose>
+			</td>
 		</c:forEach>
 		</tr>
 		<tr class="graphs"><td colspan="${w:size(model.operations)*4 + 2}" style="display:none"><div id="${domain.key}" style="display:none"></div></td></tr>
@@ -142,7 +161,7 @@
 		}else{
 			url = "";
 		}
-		window.location.href = "?op=${payload.action.name}&type=${payload.type}&domain=${model.domain}&id=${payload.id}&ip=${payload.ipAddress}&reportType=${model.reportType}&date=${model.date}&operations=" + url;
+		window.location.href = "?op=${payload.action.name}&type=${payload.type}&domain=${model.domain}&id=${payload.id}&ip=${payload.ipAddress}&reportType=${payload.reportType}&date=${model.date}&operations=" + url;
 	}
 	
 	function init(){
@@ -163,10 +182,11 @@
 
 		if('${payload.type}' == 'SQL'){
 			$('#Database_report').addClass('active open');
-			$('#database_operation').addClass('active');
 		}else if('${payload.type}' == 'Cache'){
 			$('#Cache_report').addClass('active open');
 			$('#cache_operation').addClass('active');
+		}else if('${payload.type}' == 'RPC'){
+			$('#RPC_report').addClass('active open');
 		}
 		init();
 	});

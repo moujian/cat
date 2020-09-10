@@ -7,15 +7,33 @@
 <jsp:useBean id="payload" type="com.dianping.cat.report.page.app.Payload" scope="request" />
 <jsp:useBean id="model" type="com.dianping.cat.report.page.app.Model" scope="request" />
 
-<a:body>
-	<link rel="stylesheet" type="text/css" href="${model.webapp}/js/jquery.datetimepicker.css"/>
-	<script src="${model.webapp}/js/jquery.datetimepicker.js"></script>
-	<res:useJs value="${res.js.local['baseGraph.js']}" target="head-js" />
+<a:mobile>
 	<script type="text/javascript">
-		var commandInfo = ${model.command};
+		var commandsMap = ${model.commandsJson};
+		var commandInfo = ${model.command2CodesJson};
+		var globalInfo = ${model.globalCodesJson};
+		
+		var queryCodeByCommand = function queryCode(commandId){
+			var value = commandInfo[commandId];
+			var command = commandsMap[commandId];
+			var globalcodes = globalInfo[command.namespace].codes;
+			var result = {};
+			
+			for(var tmp in globalcodes){
+				result[globalcodes[tmp].id] =globalcodes[tmp].name;
+			}
+			
+			for (var prop in value) {
+				result[value[prop].id] =value[prop].value;
+			}
+			
+			return result;
+		}
+		
 		var command1Change = function command1Change() {
-			var key = $("#command").val();
-			var value = commandInfo[key];
+			var command = $("#command").val().split('|')[0];
+			var commandId = ${model.command2IdJson}[command].id;
+			var value = queryCodeByCommand(commandId);
 			var code = document.getElementById("code");
 			$(code).empty();
 			
@@ -27,8 +45,8 @@
 			for ( var prop in value) {
 				var opt = $('<option />');
 
-				opt.html(value[prop].name);
-				opt.val(value[prop].id);
+				opt.html(value[prop]);
+				opt.val(prop);
 				opt.appendTo(code);
 			}
 		}
@@ -82,22 +100,23 @@
 			var period = times[0];
 			var start = converTimeFormat(times[1]);
 			var end = converTimeFormat($("#time2").val());
-			var command = $("#command").val();
+			var command = $("#command").val().split('|')[0];
+			var commandId = ${model.command2IdJson}[command].id;
 			var code = $("#code").val();
 			var network = $("#network").val();
 			var version = $("#app-version").val();
-			var connectionType = $("#connnect-type").val();
+			var connectionType = $("#connect-type").val();
 			var platform = $("#platform").val();
 			var city = $("#city").val();
 			var operator = $("#operator").val();
 			var group = $("#group").val();
 			var split = ";";
-			var query1 = period + split + command + split + code + split
+			var query1 = period + split + commandId + split + code + split
 					+ network + split + version + split + connectionType
 					+ split + platform + split + city + split + operator + split + start + split + end;
 			
 			var field = $("#piechartSelect").val();
-			var href = "?op=piechart&query1=" + query1 + "&groupByField=" + field + "&domains="+group;
+			var href = "?op=${payload.action.name}&query1=" + query1 + "&groupByField=" + field+"&commandId="+$("#command").val();
  			window.location.href = href;
  		}
 		
@@ -105,65 +124,15 @@
 			document.getElementById("code").disabled = false;
 			document.getElementById("network").disabled = false;
 			document.getElementById("app-version").disabled = false;
-			document.getElementById("connnect-type").disabled = false;
+			document.getElementById("connect-type").disabled = false;
 			document.getElementById("platform").disabled = false;
 			document.getElementById("city").disabled = false;
-			document.getElementById("operator").disabled = false;
 			document.getElementById($("#piechartSelect").val()).disabled = true;
-		}
-		
-		var domainToCommandsJson = ${model.domainToCommandsJson};
-
-		function changeDomain(domainId, commandId, domainInitVal, commandInitVal){
-			if(domainInitVal == ""){
-				domainInitVal = $("#"+domainId).val()
-			}
-			var commandSelect = $("#"+commandId);
-			var commands = domainToCommandsJson[domainInitVal];
-			
-			$("#"+domainId).val(domainInitVal);
-			commandSelect.empty();
-			for(var cou in commands){
-				var command = commands[cou];
-				if(command['title'] != undefined && command['title'].length > 0){
-					commandSelect.append($("<option value='"+command['id']+"'>"+command['title']+"</option>"));
-				}else{
-					commandSelect.append($("<option value='"+command['id']+"'>"+command['name']+"</option>"));
-				}
-			}
-			if(typeof commandInitVal != 'undefined' && commandInitVal.length > 0){
-				commandSelect.val(commandInitVal);
-			}
-		}
-		
-		function changeCommandByDomain(){
-			var domain = $("#group").val();
-			var commandSelect = $("#command");
-			var commands = domainToCommandsJson[domain];
-			commandSelect.empty();
-			
-			for(var cou in commands){
-				var command = commands[cou];
-				if(command['title'] != undefined && command['title'].length > 0){
-					commandSelect.append($("<option value='"+command['id']+"'>"+command['title']+"</option>"));
-				}else{
-					commandSelect.append($("<option value='"+command['id']+"'>"+command['name']+"</option>"));
-				}
-			}
-		}
-		
-		function initDomain(domainSelectId, commandSelectId, domainInitVal, commandInitVal){
-			var domainsSelect = $("#"+domainSelectId);
-			for(var domain in domainToCommandsJson){
-				domainsSelect.append($("<option value='"+domain+"'>"+domain+"</option>"))
-			}
-			changeDomain(domainSelectId, commandSelectId, domainInitVal, commandInitVal);
-			command1Change();
-			domainsSelect.on('change', changeCommandByDomain);
 		}
 
 		$(document).ready(
 				function() {
+					$('#App_report').addClass('active open');
 					$('#connPiechart').addClass('active');
 					$('#time').datetimepicker({
 						format:'Y-m-d H:i',
@@ -181,8 +150,6 @@
 					var words = query1.split(";");
 
 					command1.on('change', command1Change);
-					initDomain('group', 'command', '${payload.domains}', words[1]);
-					
 					$("#piechartSelect").on('change', refreshDisabled);
 					
 					if (words[0] == null || words.length == 1) {
@@ -196,23 +163,70 @@
 					}else{
 						$("#time2").val(words[10]);
 					}
+					
+					if(typeof(words[1]) != 'undefined' && words[1].length > 0){
+						$("#command").val('${payload.commandId}');
+					}else{
+						$("#command").val('${model.defaultCommand}');
+					}
+					command1Change();
 
 					$("#code").val(words[2]);
 					$("#network").val(words[3]);
 					$("#app-version").val(words[4]);
-					$("#connnect-type").val(words[5]);
+					$("#connect-type").val(words[5]);
 					$("#platform").val(words[6]);
 					$("#city").val(words[7]);
 					$("#operator").val(words[8]);
 					$("#piechartSelect").val('${payload.groupByField.name}');
 					refreshDisabled();
 					
-					graphPieChart(document.getElementById('piechart'), ${model.pieChart.jsonString});
+					 $.widget( "custom.catcomplete", $.ui.autocomplete, {
+							_renderMenu: function( ul, items ) {
+								var that = this,
+								currentCategory = "";
+								$.each( items, function( index, item ) {
+									if ( item.category != currentCategory ) {
+										ul.append( "<li class='ui-autocomplete-category'>" + item.category + "</li>" );
+										currentCategory = item.category;
+									}
+									that._renderItemData( ul, item );
+								});
+							}
+						});
+			
+					
+					var data = [];
+					<c:forEach var="command" items="${model.commands}">
+								var item = {};
+								item['label'] = '${command.value.name}|${command.value.title}';
+								if('${command.value.domain}'.length >0 ){
+									item['category'] ='${command.value.domain}';
+								}else{
+									item['category'] ='未知项目';
+								}
+								data.push(item);
+					</c:forEach>
+							
+					$( "#command" ).catcomplete({
+						delay: 0,
+						source: data
+					});
+					$('#command').blur(function(){
+						command1Change();
+					})
+					$('#wrap_search').submit(
+							function(){
+								command1Change();
+								return false;
+							}		
+						);
+					graphPieChart(document.getElementById('piechart'), ${model.connDisplayInfo.pieChart.jsonString});
 				});
 	</script>
 	
-		<%@include file="piechartDetail.jsp"%>
-</a:body>
+		<%@include file="connPiechartDetail.jsp"%>
+</a:mobile>
 
 <style type="text/css">
 	.row-fluid .span2{

@@ -1,46 +1,64 @@
+/*
+ * Copyright (c) 2011-2018, Meituan Dianping. All Rights Reserved.
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.dianping.cat.consumer.top;
 
-import java.util.ConcurrentModificationException;
-import java.util.Date;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import org.codehaus.plexus.logging.LogEnabled;
 import org.codehaus.plexus.logging.Logger;
+import org.unidal.helper.Splitters;
 import org.unidal.lookup.annotation.Inject;
+import org.unidal.lookup.annotation.Named;
 
-import com.dianping.cat.Cat;
 import com.dianping.cat.Constants;
 import com.dianping.cat.analysis.AbstractMessageAnalyzer;
-import com.dianping.cat.consumer.problem.ProblemAnalyzer;
-import com.dianping.cat.consumer.problem.model.entity.Entity;
-import com.dianping.cat.consumer.problem.model.entity.Machine;
-import com.dianping.cat.consumer.problem.model.entity.ProblemReport;
-import com.dianping.cat.consumer.problem.model.entity.Segment;
-import com.dianping.cat.consumer.top.model.entity.Error;
+import com.dianping.cat.analysis.MessageAnalyzer;
+import com.dianping.cat.config.server.ServerFilterConfigManager;
+import com.dianping.cat.consumer.top.model.entity.Segment;
 import com.dianping.cat.consumer.top.model.entity.TopReport;
 import com.dianping.cat.message.Event;
 import com.dianping.cat.message.spi.MessageTree;
-import com.dianping.cat.service.DefaultReportManager.StoragePolicy;
-import com.dianping.cat.service.ReportManager;
+import com.dianping.cat.report.DefaultReportManager.StoragePolicy;
+import com.dianping.cat.report.ReportManager;
 
+@Named(type = MessageAnalyzer.class, value = TopAnalyzer.ID, instantiationStrategy = Named.PER_LOOKUP)
 public class TopAnalyzer extends AbstractMessageAnalyzer<TopReport> implements LogEnabled {
 	public static final String ID = "top";
 
 	@Inject(ID)
 	private ReportManager<TopReport> m_reportManager;
 
-	private ProblemAnalyzer m_problemAnalyzer;
+	@Inject
+	private ServerFilterConfigManager m_serverFilterConfigManager;
+
+	private Set<String> m_errorTypes;
 
 	@Override
 	public synchronized void doCheckpoint(boolean atEnd) {
 		long startTime = getStartTime();
 
 		if (atEnd && !isLocalMode()) {
-			m_reportManager.getHourlyReport(startTime, Constants.CAT, true);
-			m_reportManager.getHourlyReports(startTime).put(Constants.CAT, getReport(Constants.CAT));
-			m_reportManager.storeHourlyReports(startTime, StoragePolicy.FILE_AND_DB);
+			m_reportManager.storeHourlyReports(startTime, StoragePolicy.FILE_AND_DB, m_index);
 		} else {
-			m_reportManager.storeHourlyReports(startTime, StoragePolicy.FILE);
+			m_reportManager.storeHourlyReports(startTime, StoragePolicy.FILE, m_index);
 		}
 	}
 
@@ -51,100 +69,60 @@ public class TopAnalyzer extends AbstractMessageAnalyzer<TopReport> implements L
 
 	@Override
 	public TopReport getReport(String domain) {
-		Set<String> domains = m_problemAnalyzer.getDomains();
-		TopReport topReport = new TopReport(Constants.CAT);
-
-		topReport.setStartTime(new Date(m_startTime));
-		topReport.setEndTime(new Date(m_startTime + 60 * MINUTE - 1));
-
-
-		ProblemReportVisitor problemReportVisitor = new ProblemReportVisitor(topReport);
-
-		for (String name : domains) {
-			try {
-				if (m_serverConfigManager.validateDomain(name) || Constants.FRONT_END.equals(name)) {
-					ProblemReport report = m_problemAnalyzer.getReport(name);
-
-					problemReportVisitor.visitProblemReport(report);
-				}
-			} catch (ConcurrentModificationException e) {
-				try {
-					ProblemReport report = m_problemAnalyzer.getReport(name);
-
-					problemReportVisitor.visitProblemReport(report);
-				} catch (ConcurrentModificationException ce) {
-					Cat.logEvent("ConcurrentModificationException", name, Event.SUCCESS, null);
-				}
-			} catch (Exception e) {
-				Cat.logError(e);
-			}
-		}
-		return topReport;
+		return m_reportManager.getHourlyReport(getStartTime(), Constants.CAT, false);
 	}
 
 	@Override
-	public boolean isRawAnalyzer() {
-		return false;
+	public ReportManager<TopReport> getReportManager() {
+		return m_reportManager;
 	}
 
 	@Override
-	protected void process(MessageTree tree) {
+	public boolean isEligable(MessageTree tree) {
+		if (tree.getEvents().size() > 0) {
+			return true;
+		} else {
+			return false;
+		}
 	}
 
-	public void setProblemAnalyzer(ProblemAnalyzer problemAnalyzer) {
-		m_problemAnalyzer = problemAnalyzer;
+	@Override
+	protected void loadReports() {
+		m_reportManager.loadHourlyReports(getStartTime(), StoragePolicy.FILE, m_index);
 	}
 
-	public static class ProblemReportVisitor extends com.dianping.cat.consumer.problem.model.transform.BaseVisitor {
-		private String m_domain;
+	@Override
+	public void process(MessageTree tree) {
+		String domain = tree.getDomain();
 
-		private String m_ip;
+		if (m_serverFilterConfigManager.validateDomain(domain)) {
+			TopReport report = m_reportManager.getHourlyReport(getStartTime(), Constants.CAT, true);
 
-		private String m_type;
+			List<Event> events = tree.getEvents();
 
-		private String m_state;
-
-		private TopReport m_report;
-
-		public ProblemReportVisitor(TopReport report) {
-			m_report = report;
-		}
-
-		@Override
-		public void visitEntity(Entity entity) {
-			m_type = entity.getType();
-			m_state = entity.getStatus();
-			super.visitEntity(entity);
-		}
-
-		@Override
-		public void visitMachine(Machine machine) {
-			m_ip = machine.getIp();
-			super.visitMachine(machine);
-		}
-
-		@Override
-		public void visitProblemReport(ProblemReport problemReport) {
-			m_domain = problemReport.getDomain();
-			super.visitProblemReport(problemReport);
-		}
-
-		@Override
-		public void visitSegment(Segment segment) {
-			int id = segment.getId();
-			int count = segment.getCount();
-
-			if ("error".equals(m_type)) {
-				com.dianping.cat.consumer.top.model.entity.Segment segmentDetail = m_report.findOrCreateDomain(m_domain)
-				      .findOrCreateSegment(id);
-				segmentDetail.setError(segmentDetail.getError() + count);
-
-				Error error = segmentDetail.findOrCreateError(m_state);
-
-				error.setCount(error.getCount() + count);
-				segmentDetail.findOrCreateMachine(m_ip).incCount(count);
+			for (Event e : events) {
+				processEvent(report, tree, e);
 			}
 		}
 	}
 
+	private void processEvent(TopReport report, MessageTree tree, Event event) {
+		String type = event.getType();
+
+		if (m_errorTypes.contains(type)) {
+			String domain = tree.getDomain();
+			String ip = tree.getIpAddress();
+			String exception = event.getName();
+			long current = event.getTimestamp() / 1000 / 60;
+			int min = (int) (current % (60));
+			Segment segment = report.findOrCreateDomain(domain).findOrCreateSegment(min).incError();
+
+			segment.findOrCreateError(exception).incCount();
+			segment.findOrCreateMachine(ip).incCount();
+		}
+	}
+
+	public void setErrorType(String type) {
+		m_errorTypes = new HashSet<String>(Splitters.by(',').noEmptyItem().split(type));
+	}
 }

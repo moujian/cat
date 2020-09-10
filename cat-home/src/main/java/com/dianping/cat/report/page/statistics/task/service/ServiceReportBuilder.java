@@ -1,3 +1,21 @@
+/*
+ * Copyright (c) 2011-2018, Meituan Dianping. All Rights Reserved.
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.dianping.cat.report.page.statistics.task.service;
 
 import java.util.Collection;
@@ -7,11 +25,12 @@ import java.util.Map;
 import java.util.Set;
 
 import org.unidal.lookup.annotation.Inject;
+import org.unidal.lookup.annotation.Named;
 
 import com.dianping.cat.Cat;
 import com.dianping.cat.Constants;
+import com.dianping.cat.config.server.ServerFilterConfigManager;
 import com.dianping.cat.configuration.NetworkInterfaceManager;
-import com.dianping.cat.configuration.ServerConfigManager;
 import com.dianping.cat.consumer.cross.CrossAnalyzer;
 import com.dianping.cat.consumer.cross.model.entity.CrossReport;
 import com.dianping.cat.core.dal.DailyReport;
@@ -29,6 +48,7 @@ import com.dianping.cat.report.page.statistics.service.ServiceReportService;
 import com.dianping.cat.report.task.TaskBuilder;
 import com.dianping.cat.report.task.TaskHelper;
 
+@Named(type = TaskBuilder.class, value = ServiceReportBuilder.ID)
 public class ServiceReportBuilder implements TaskBuilder {
 
 	public static final String ID = Constants.REPORT_SERVICE;
@@ -39,10 +59,10 @@ public class ServiceReportBuilder implements TaskBuilder {
 	@Inject
 	protected CrossReportService m_crossReportService;
 
-	@Inject
-	private ServerConfigManager m_configManger;
-
 	Map<String, Domain> stat = new HashMap<String, Domain>();
+
+	@Inject
+	private ServerFilterConfigManager m_configManger;
 
 	@Override
 	public boolean buildDailyTask(String name, String domain, Date period) {
@@ -111,8 +131,8 @@ public class ServiceReportBuilder implements TaskBuilder {
 
 	@Override
 	public boolean buildWeeklyTask(String name, String domain, Date period) {
-		ServiceReport serviceReport = queryDailyReportsByDuration(domain, period, new Date(period.getTime()
-		      + TimeHelper.ONE_WEEK));
+		ServiceReport serviceReport = queryDailyReportsByDuration(domain, period,
+								new Date(period.getTime()	+ TimeHelper.ONE_WEEK));
 		WeeklyReport report = new WeeklyReport();
 
 		report.setCreationDate(new Date());
@@ -143,8 +163,8 @@ public class ServiceReportBuilder implements TaskBuilder {
 
 		for (; startTime < endTime; startTime += TimeHelper.ONE_DAY) {
 			try {
-				ServiceReport reportModel = m_reportService.queryReport(domain, new Date(startTime), new Date(startTime
-				      + TimeHelper.ONE_DAY));
+				ServiceReport reportModel = m_reportService
+										.queryReport(domain, new Date(startTime), new Date(startTime	+ TimeHelper.ONE_DAY));
 				reportModel.accept(merger);
 			} catch (Exception e) {
 				Cat.logError(e);
@@ -164,8 +184,8 @@ public class ServiceReportBuilder implements TaskBuilder {
 
 		for (; startTime < endTime; startTime = startTime + TimeHelper.ONE_HOUR) {
 			Date date = new Date(startTime);
-			ServiceReport reportModel = m_reportService.queryReport(domain, date, new Date(date.getTime()
-			      + TimeHelper.ONE_HOUR));
+			ServiceReport reportModel = m_reportService
+									.queryReport(domain, date, new Date(date.getTime()	+ TimeHelper.ONE_HOUR));
 
 			reportModel.accept(merger);
 		}
@@ -178,8 +198,8 @@ public class ServiceReportBuilder implements TaskBuilder {
 	}
 
 	private boolean validataService(TypeDetailInfo typeInfo) {
-		return typeInfo.getProjectName().equalsIgnoreCase(ProjectInfo.ALL_SERVER)
-		      || typeInfo.getProjectName().equalsIgnoreCase("UnknownProject");
+		return typeInfo.getProjectName().equalsIgnoreCase(ProjectInfo.ALL_SERVER)	|| typeInfo.getProjectName()
+								.equalsIgnoreCase("UnknownProject");
 	}
 
 }

@@ -7,7 +7,7 @@
 <jsp:useBean id="payload"  	type="com.dianping.cat.report.page.cross.Payload" scope="request" />
 <jsp:useBean id="model" type="com.dianping.cat.report.page.cross.Model" scope="request" />
 
-<a:report title="Cross Report"
+<a:hourly_report title="Cross Report"
 	navUrlPrefix="ip=${model.ipAddress}&domain=${model.domain}">
 	<jsp:attribute name="subtitle">${w:format(model.report.startTime,'yyyy-MM-dd HH:mm:ss')} to ${w:format(model.report.endTime,'yyyy-MM-dd HH:mm:ss')}</jsp:attribute>
 	<jsp:body>
@@ -16,6 +16,7 @@
 <res:useJs value="${res.js.local['jquery.dataTables.min.js']}" target="head-js"/>
 <script type="text/javascript">
 	$(document).ready(function() {
+		$(".breadcrumbs .nav").hide();
 		$('#contents').dataTable({
 			"sPaginationType": "full_numbers",
 			'iDisplayLength': 100,
@@ -66,7 +67,7 @@
 </table>
 </br>
 </jsp:body>
-</a:report>
+</a:hourly_report>
 <style>
 .dataTables_wrapper {
 	/* position: relative; */

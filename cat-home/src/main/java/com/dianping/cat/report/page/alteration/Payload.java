@@ -1,3 +1,21 @@
+/*
+ * Copyright (c) 2011-2018, Meituan Dianping. All Rights Reserved.
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.dianping.cat.report.page.alteration;
 
 import java.text.ParseException;
@@ -9,10 +27,10 @@ import org.unidal.web.mvc.ActionContext;
 import org.unidal.web.mvc.payload.annotation.FieldMeta;
 
 import com.dianping.cat.helper.TimeHelper;
+import com.dianping.cat.mvc.AbstractReportPayload;
 import com.dianping.cat.report.ReportPage;
-import com.dianping.cat.report.page.AbstractReportPayload;
 
-public class Payload extends AbstractReportPayload<Action> {
+public class Payload extends AbstractReportPayload<Action, ReportPage> {
 	private ReportPage m_page;
 
 	@FieldMeta("altType")
@@ -60,9 +78,12 @@ public class Payload extends AbstractReportPayload<Action> {
 	@FieldMeta("count")
 	private int m_count;
 
-	private SimpleDateFormat m_sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+	@FieldMeta("status")
+	private int m_status;
 
-	private SimpleDateFormat m_minSdf = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+	private SimpleDateFormat m_sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+
+	private SimpleDateFormat m_secondFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
 	public Payload() {
 		super(ReportPage.ALTERATION);
@@ -77,16 +98,33 @@ public class Payload extends AbstractReportPayload<Action> {
 		}
 	}
 
+	public void setAction(String action) {
+		m_action = Action.getByName(action, Action.VIEW);
+	}
+
 	public Date getAlterationDate() {
 		try {
-			return m_sdf.parse(m_alterationDate);
+			if (m_alterationDate.length() == 16) {
+				return m_sdf.parse(m_alterationDate);
+			} else {
+				return m_secondFormat.parse(m_alterationDate);
+			}
+
 		} catch (ParseException e) {
 			return new Date();
 		}
 	}
 
+	public void setAlterationDate(String alterationDate) {
+		m_alterationDate = alterationDate;
+	}
+
 	public String getAltType() {
 		return m_altType;
+	}
+
+	public void setAltType(String altType) {
+		m_altType = altType;
 	}
 
 	public String[] getAltTypeArray() {
@@ -101,12 +139,20 @@ public class Payload extends AbstractReportPayload<Action> {
 		return m_content;
 	}
 
+	public void setContent(String content) {
+		m_content = content;
+	}
+
 	public int getCount() {
 		if (m_count == 0) {
 			return 10;
 		} else {
 			return m_count;
 		}
+	}
+
+	public void setCount(int count) {
+		m_count = count;
 	}
 
 	public String getDomain() {
@@ -117,20 +163,32 @@ public class Payload extends AbstractReportPayload<Action> {
 		}
 	}
 
+	public void setDomain(String domain) {
+		m_domain = domain;
+	}
+
 	public Date getEndTime() {
 		if (m_endTime == null || m_endTime.length() == 0) {
 			return new Date();
 		} else {
 			try {
-				return m_minSdf.parse(m_endTime);
+				return m_sdf.parse(m_endTime);
 			} catch (ParseException e) {
 				return new Date();
 			}
 		}
 	}
 
+	public void setEndTime(String endTime) {
+		m_endTime = endTime;
+	}
+
 	public String getGroup() {
 		return m_group;
+	}
+
+	public void setGroup(String group) {
+		m_group = group;
 	}
 
 	public String getHostname() {
@@ -141,12 +199,25 @@ public class Payload extends AbstractReportPayload<Action> {
 		}
 	}
 
+	public void setHostname(String hostname) {
+		m_hostname = hostname;
+	}
+
 	public String getIp() {
 		return m_ip;
 	}
 
+	public void setIp(String ip) {
+		m_ip = ip;
+	}
+
 	public ReportPage getPage() {
 		return m_page;
+	}
+
+	@Override
+	public void setPage(String page) {
+		m_page = ReportPage.getByName(page, ReportPage.ALTERATION);
 	}
 
 	public Date getStartTime() {
@@ -154,11 +225,23 @@ public class Payload extends AbstractReportPayload<Action> {
 			return new Date(System.currentTimeMillis() - TimeHelper.ONE_HOUR / 4);
 		} else {
 			try {
-				return m_minSdf.parse(m_startTime);
+				return m_sdf.parse(m_startTime);
 			} catch (ParseException e) {
 				return new Date();
 			}
 		}
+	}
+
+	public void setStartTime(String startTime) {
+		m_startTime = startTime;
+	}
+
+	public int getStatus() {
+		return m_status;
+	}
+
+	public void setStatus(int status) {
+		m_status = status;
 	}
 
 	public String getTitle() {
@@ -169,85 +252,36 @@ public class Payload extends AbstractReportPayload<Action> {
 		return m_title;
 	}
 
-	public String getType() {
-		return m_type;
-	}
-
-	public String getUrl() {
-		return m_url;
-	}
-
-	public String getUser() {
-		return m_user;
-	}
-
-	public void setAction(String action) {
-		m_action = Action.getByName(action, Action.VIEW);
-	}
-
-	public void setAlterationDate(String alterationDate) {
-		m_alterationDate = alterationDate;
-	}
-
-	public void setAltType(String altType) {
-		m_altType = altType;
-	}
-
-	public void setContent(String content) {
-		m_content = content;
-	}
-
-	public void setCount(int count) {
-		m_count = count;
-	}
-
-	public void setDomain(String domain) {
-		m_domain = domain;
-	}
-
-	public void setEndTime(String endTime) {
-		m_endTime = endTime;
-	}
-
-	public void setGroup(String group) {
-		m_group = group;
-	}
-
-	public void setHostname(String hostname) {
-		m_hostname = hostname;
-	}
-
-	public void setIp(String ip) {
-		m_ip = ip;
-	}
-
-	public void setPage(ReportPage page) {
-		m_page = page;
-	}
-
-	@Override
-	public void setPage(String page) {
-		m_page = ReportPage.getByName(page, ReportPage.ALTERATION);
-	}
-
-	public void setStartTime(String startTime) {
-		m_startTime = startTime;
-	}
-
 	public void setTitle(String title) {
 		m_title = title;
+	}
+
+	public String getType() {
+		return m_type;
 	}
 
 	public void setType(String type) {
 		m_type = type;
 	}
 
+	public String getUrl() {
+		return m_url;
+	}
+
 	public void setUrl(String url) {
 		m_url = url;
 	}
 
+	public String getUser() {
+		return m_user;
+	}
+
 	public void setUser(String user) {
 		m_user = user;
+	}
+
+	public void setPage(ReportPage page) {
+		m_page = page;
 	}
 
 	@Override

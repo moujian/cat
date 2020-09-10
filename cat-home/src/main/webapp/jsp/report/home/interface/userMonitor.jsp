@@ -94,10 +94,10 @@
 		<tr><td>version</td><td>versionCode, eg. 6.8 = 680</td><td>int</td></tr>
 		<tr><td>platform</td><td>android=1 or ios=2</td><td>int</td></tr>
 		<tr><td>page</td><td>加载页面，eg. index.bin</td><td>String</td></tr>
-		<tr><td>step1-responseTime1</td><td>页面加载第1阶段及延时，eg. 1-300</td><td>String</td></tr>
-		<tr><td>step2-responseTime2</td><td>页面加载第2阶段及延时，eg. 1-300</td><td>String</td></tr>
-		<tr><td>.......</td><td>页面加载阶段及延时，eg. 1-300</td><td>String</td></tr>
-		<tr><td>stepN-responseTimeN</td><td>页面加载第N阶段及延时，eg. 1-300</td><td>String</td></tr>
+		<tr><td>step1-responseTime1</td><td>页面加载第1阶段及延时，eg. 1-300</td><td>String,responseTime单位为毫秒</td></tr>
+		<tr><td>step2-responseTime2</td><td>页面加载第2阶段及延时，eg. 1-300</td><td>String,responseTime单位为毫秒</td></tr>
+		<tr><td>.......</td><td>页面加载阶段及延时，eg. 1-300</td><td>String,responseTime单位为毫秒</td></tr>
+		<tr><td>stepN-responseTimeN</td><td>页面加载第N阶段及延时，eg. 1-300</td><td>String,responseTime单位为毫秒</td></tr>
 	</table>
 	
 	<pre>
@@ -115,6 +115,64 @@
 	1400037748196<span class="text-danger">\t</span>1<span class="text-danger">\t</span>680<span class="text-danger">\t</span>1<span class="text-danger">\t</span>page5<span class="text-danger">\t</span>1-20<span class="text-danger">\t</span>2-30<span class="text-danger">\t</span>3-40<span class="text-danger">\t</span>4-50<span class="text-danger">\n</span>
 	</pre>	
 </br>
+
+<h4 class="text-danger">APP Crash日志接口</h4>
+	<pre>	http://{ip}/broker-service/api/crash</pre>
+	<table class="table table-bordered table-striped table-condensed  ">
+		<tr><th>参数名</th><th>描述</th><th>类型</th></tr>
+		<tr><td>mt</td><td>手机类型，andriod传入1，ios传入2</td><td>int</td></tr>
+		<tr><td>av</td><td>APP的版本号，比如1.0.0</td><td>String</td></tr>
+		<tr><td>pv</td><td>平台版本，比如7.0.1</td><td>String</td></tr>
+		<tr><td>m</td><td>模块名，支持模块区分</td><td>String</td></tr>
+		<tr><td>msg</td><td>crash的简单原因，后续统计根据msg进行分类，比如NullPointException</td><td>String</td></tr>
+		<tr><td>l</td><td>错误等级，默认值可以传warning、error可以用来进行错误区分</td><td>String</td></tr>
+		<tr><td>d</td><td>详细的错误日志</td><td>String</td></tr>
+	</table>
+	
+	<p class="text-danger">参数可以post上来，需要对value进行encode。</p>
+	<p class="text-danger">如下手机类型是ios，app版本号1.1，平台版本号1.2，模块是user，错误等级为error，错误原因为java.npe</p>
+	<pre>
+		http://{ip}/broker-service/api/crash?mt=2&av=1.1&pv=1.2&m=user&msg=java.npe&l=error&d=dddddsfsdfsdfsdf	
+	</pre>
+</br>
+
+
+<h4 class="text-danger">APP 长连访问批量接口</h4>
+	<pre>	http://{ip}/broker-service/api/connection</pre>
+	<p>批量接口POST内容，前面加上“<span class="text-danger">v=3&c=</span>”，不同请求之间用回车<span class="text-danger">ENTER</span>分隔，字段之间用<span class="text-danger">TAB</span>分隔。</p>
+	
+	<table class="table table-bordered table-striped table-condensed  ">
+		<tr><th>实际名称</th><th>描述</th><th>类型</th></tr>
+		<tr><td>timestamp</td><td>发送数据时的时间戳</td><td>long</td></tr>
+		<tr><td>network</td><td>2G,3G,4G,WIFI(iOS只有3G和WIFI)，1=wifi, 2=2G, 3=3G, 4=4G, 0=Unknown</td><td>int</td></tr>
+		<tr><td>version</td><td>versionCode,比如6.8=680,只支持int类型</td><td>int</td></tr>
+		<tr><td>tunnel</td><td>固定为1，表示是长连</td><td>int</td></tr>
+		<tr><td>command</td><td>接口，一般为url path的最后一个单位(shop.bin)</td><td>String</td></tr>
+		<tr><td>code</td><td>status code,建议区分http的返回码,比如>1000为业务错误码,<1000为网络错误码,<0为自定义错误码</td><td>int</td></tr>
+		<tr><td>platform</td><td>android=1,ios=2,Unknown=0</td><td>int</td></tr>
+		<tr><td>requestbyte</td><td>发送字节数</td><td>int</td></tr>
+		<tr><td>responsebyte</td><td>返回字节数</td><td>int</td></tr>
+		<tr><td>responsetime</td><td>用时 (毫秒）</td><td>int</td></tr>
+	</table>
+	
+	<pre>
+	单个请求格式如下
+	timstamp<span class="text-danger">TAB</span>network<span class="text-danger">TAB</span>version<span class="text-danger">TAB</span>tunnel<span class="text-danger">TAB</span>command<span class="text-danger">TAB</span>code<span class="text-danger">TAB</span>platform<span class="text-danger">TAB</span>requestbyte<span class="text-danger">TAB</span>responsebyte<span class="text-danger">TAB</span>responsetime<span class="text-danger">ENTER</span>
+	
+	新版本加入了接入点IP
+	</pre>
+	<p>POST内容如果有如下5个请求，Sample的POST内容为，</p>
+	<p class="text-danger">v=2&c=不需要做urlencode，后面的批量的content部分需要urlencode。</p>
+	<pre>
+	v=3&c=
+	1400037748152<span class="text-danger">\t</span>1<span class="text-danger">\t</span>680<span class="text-danger">\t</span>1<span class="text-danger">\t</span>shop.bin<span class="text-danger">\t</span>200<span class="text-danger">\t</span>1<span class="text-danger">\t</span>100<span class="text-danger">\t</span>100<span class="text-danger">\t</span>200<span class="text-danger">\n</span> 
+	1400037748163<span class="text-danger">\t</span>1<span class="text-danger">\t</span>680<span class="text-danger">\t</span>1<span class="text-danger">\t</span>shop.bin<span class="text-danger">\t</span>200<span class="text-danger">\t</span>2<span class="text-danger">\t</span>120<span class="text-danger">\t</span>110<span class="text-danger">\t</span>300<span class="text-danger">\n</span> 
+	1400037748174<span class="text-danger">\t</span>1<span class="text-danger">\t</span>680<span class="text-danger">\t</span>1<span class="text-danger">\t</span>shop.bin<span class="text-danger">\t</span>200<span class="text-danger">\t</span>3<span class="text-danger">\t</span>110<span class="text-danger">\t</span>120<span class="text-danger">\t</span>200<span class="text-danger">\n</span> 
+	1400037748185<span class="text-danger">\t</span>1<span class="text-danger">\t</span>680<span class="text-danger">\t</span>1<span class="text-danger">\t</span>shop.bin<span class="text-danger">\t</span>200<span class="text-danger">\t</span>1<span class="text-danger">\t</span>120<span class="text-danger">\t</span>130<span class="text-danger">\t</span>100<span class="text-danger">\n</span> 
+	1400037748196<span class="text-danger">\t</span>1<span class="text-danger">\t</span>680<span class="text-danger">\t</span>1<span class="text-danger">\t</span>shop.bin<span class="text-danger">\t</span>500<span class="text-danger">\t</span>2<span class="text-danger">\t</span>110<span class="text-danger">\t</span>140<span class="text-danger">\t</span>200<span class="text-danger">\n</span>
+	</pre>	
+</br>
+
 <h4 class="text-danger">JS 错误接口</h4>
 	<pre>	http://{ip}/broker-service/api/js</pre>
 	
@@ -141,20 +199,29 @@
 	sample如下:
 	
 	v=1&c=
-	1400037748182<span class="text-danger">TAB</span>http://dianping.com/shop<span class="text-danger">TAB</span>300<span class="text-danger">TAB</span>200<span class="text-danger">TAB</span>300<span class="text-danger">TAB</span>300<span class="text-danger">ENTER</span>
-	1400037748182<span class="text-danger">TAB</span>http://dianping.com/shop<span class="text-danger">TAB</span>300<span class="text-danger">TAB</span>200<span class="text-danger">TAB</span>300<span class="text-danger">TAB</span>300<span class="text-danger">ENTER</span>
-	1400037748182<span class="text-danger">TAB</span>http://dianping.com/shop<span class="text-danger">TAB</span>300<span class="text-danger">TAB</span>200<span class="text-danger">TAB</span>300<span class="text-danger">TAB</span>300<span class="text-danger">ENTER</span>
+	1400037748182<span class="text-danger">TAB</span>cdn-resource1<span class="text-danger">TAB</span>300<span class="text-danger">TAB</span>200<span class="text-danger">TAB</span>300<span class="text-danger">TAB</span>300<span class="text-danger">ENTER</span>
+	1400037748182<span class="text-danger">TAB</span>cdn-resource2<span class="text-danger">TAB</span>300<span class="text-danger">TAB</span>200<span class="text-danger">TAB</span>300<span class="text-danger">TAB</span>300<span class="text-danger">ENTER</span>
+	1400037748182<span class="text-danger">TAB</span>cdn-resource3<span class="text-danger">TAB</span>300<span class="text-danger">TAB</span>200<span class="text-danger">TAB</span>300<span class="text-danger">TAB</span>300<span class="text-danger">ENTER</span>
 	</pre>
 	
 	<p>参数说明</p>
 	<table style="width:70%" class="table table-bordered table-striped table-condensed  ">
-		<tr><th>query名</th><th>实际名称</th><th>描述</th><th>类型</th></tr>	
-		<tr><td>v</td><td>version</td><td>API版本号</td><td>暂定为1</td></tr>
-		<tr><td>t</td><td>timestamp</td><td>发生时间</td><td>long型，1970到现在的毫秒数</td></tr>
-		<tr><td>dl</td><td>dnslookup</td><td>dns寻址时间</td><td>int</td></tr>
-		<tr><td>tc</td><td>tcpConnect</td><td>tcp连接建立</td><td>int</td></tr>
-		<tr><td>rq</td><td>request</td><td>请求时间</td><td>int</td></tr>
-		<tr><td>rs</td><td>response</td><td>接受时间</td><td>int</td></tr>
+		<tr><th>实际名称</th><th>描述</th><th>类型</th></tr>	
+		<tr><td>v</td><td>API版本号</td><td>暂定为1</td></tr>
+		<tr><td>c</td><td>具体内容</td><td>content内容</td></tr>
+	</table>
+	<p>content内容说明</p>
+	<pre>
+	timstamp<span class="text-danger">TAB</span>targetUrl<span class="text-danger">TAB</span>dnslookup<span class="text-danger">TAB</span>tcpconnect<span class="text-danger">TAB</span>request<span class="text-danger">TAB</span>response<span class="text-danger">ENTER</span>
+	</pre>
+	<table style="width:70%" class="table table-bordered table-striped table-condensed  ">
+		<tr><th>实际名称</th><th>描述</th><th>类型</th></tr>	
+		<tr><td>timestamp</td><td>发生时间</td><td>long型，1970到现在的毫秒数</td></tr>
+		<tr><td>targetUrl</td><td>具体的cdn资源</td><td>cdn资源的一个定义</td></tr>
+		<tr><td>dnslookup</td><td>dns寻址时间</td><td>int</td></tr>
+		<tr><td>tcpConnect</td><td>tcp连接建立</td><td>int</td></tr>
+		<tr><td>request</td><td>请求时间</td><td>int</td></tr>
+		<tr><td>response</td><td>接受时间</td><td>int</td></tr>
 	</table>
 <br/>
 <h4 class="text-success">URL规则配置&nbsp;  <a target="_blank" href="/cat/s/config?op=urlPatternUpdate">链接</a></h4>
@@ -181,9 +248,9 @@
 </table>
 <p> url示例<span class="text-danger">（红色部分为不同参数，没有op则需要添加，其他参数相同）</span></p>
 <pre>
-	http://cat.dianpingoa.com/cat/r/app?<span class="text-danger">op=view</span>&query1=2014-10-28;1;;;;;;;;;&query2=&type=request&groupByField=&sort=&domains=default&commandId=1&domains2=default&commandId2=1&showActivity=false 为APP监控查看的URL链接
+	http://cat.dianpingoa.com/cat/r/app?<span class="text-danger">op=view</span>&query1=2014-10-28;1;;;;;;;;;&query2=&type=request&groupByField=&sort=&domains=default&commandId=1&domains2=default&commandId2=1 为APP监控查看的URL链接
 	则获取报表的URL为：
-	http://cat.dianpingoa.com/cat/r/app?<span class="text-danger">op=linechartJson&</span>query1=2014-10-28;1;;;;;;;;;&query2=&type=request&groupByField=&sort=&domains=default&commandId=1&domains2=default&commandId2=1&showActivity=false</pre>
+	http://cat.dianpingoa.com/cat/r/app?<span class="text-danger">op=linechartJson&</span>query1=2014-10-28;1;;;;;;;;;&query2=&type=request&groupByField=&sort=&domains=default&commandId=1&domains2=default&commandId2=1</pre>
 <br>
 <h4 class="text-danger">WEB监控报表获取&nbsp;&nbsp;&nbsp;&nbsp; </h4>
 <p>Cat支持其它系统通过调用HTTP API来获取WEB监控报表数据（JSON格式）</p>

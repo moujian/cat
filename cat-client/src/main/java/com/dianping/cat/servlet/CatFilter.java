@@ -1,5 +1,31 @@
+/*
+ * Copyright (c) 2011-2018, Meituan Dianping. All Rights Reserved.
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.dianping.cat.servlet;
 
+import javax.servlet.Filter;
+import javax.servlet.FilterChain;
+import javax.servlet.FilterConfig;
+import javax.servlet.ServletException;
+import javax.servlet.ServletRequest;
+import javax.servlet.ServletResponse;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
@@ -8,18 +34,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import javax.servlet.Filter;
-import javax.servlet.FilterChain;
-import javax.servlet.FilterConfig;
-import javax.servlet.ServletException;
-import javax.servlet.ServletRequest;
-import javax.servlet.ServletResponse;
-import javax.servlet.http.Cookie;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletRequestWrapper;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpServletResponseWrapper;
-
 import org.unidal.helper.Joiners;
 import org.unidal.helper.Joiners.IBuilder;
 
@@ -27,7 +41,6 @@ import com.dianping.cat.Cat;
 import com.dianping.cat.CatConstants;
 import com.dianping.cat.configuration.NetworkInterfaceManager;
 import com.dianping.cat.configuration.client.entity.Server;
-import com.dianping.cat.message.Event;
 import com.dianping.cat.message.Message;
 import com.dianping.cat.message.MessageProducer;
 import com.dianping.cat.message.Transaction;
@@ -45,10 +58,9 @@ public class CatFilter implements Filter {
 	}
 
 	@Override
-	public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException,
-	      ServletException {
-		Context ctx = new Context(new RequestWrapper((HttpServletRequest) request), new ResponseWrapper(
-		      (HttpServletResponse) response), chain, m_handlers);
+	public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
+							throws IOException,	ServletException {
+		Context ctx = new Context((HttpServletRequest) request, (HttpServletResponse) response, chain, m_handlers);
 
 		ctx.handle();
 	}
@@ -261,10 +273,9 @@ public class CatFilter implements Filter {
 		},
 
 		LOG_SPAN {
-
 			private void customizeStatus(Transaction t, HttpServletRequest req) {
 				Object catStatus = req.getAttribute(CatConstants.CAT_STATE);
-				
+
 				if (catStatus != null) {
 					t.setStatus(catStatus.toString());
 				} else {
@@ -273,10 +284,18 @@ public class CatFilter implements Filter {
 			}
 
 			private void customizeUri(Transaction t, HttpServletRequest req) {
-				Object catPageUri = req.getAttribute(CatConstants.CAT_PAGE_URI);
-				
-				if (t instanceof DefaultTransaction && catPageUri instanceof String) {
-					((DefaultTransaction) t).setName(catPageUri.toString());
+				if (t instanceof DefaultTransaction) {
+					Object catPageType = req.getAttribute(CatConstants.CAT_PAGE_TYPE);
+
+					if (catPageType instanceof String) {
+						((DefaultTransaction) t).setType(catPageType.toString());
+					}
+
+					Object catPageUri = req.getAttribute(CatConstants.CAT_PAGE_URI);
+
+					if (catPageUri instanceof String) {
+						((DefaultTransaction) t).setName(catPageUri.toString());
+					}
 				}
 			}
 
@@ -310,27 +329,27 @@ public class CatFilter implements Filter {
 					ctx.handle();
 					customizeStatus(t, req);
 				} catch (ServletException e) {
-					Cat.logError(e);
 					t.setStatus(e);
+					Cat.logError(e);
 					throw e;
 				} catch (IOException e) {
-					Cat.logError(e);
 					t.setStatus(e);
-					throw e;
-				} catch (RuntimeException e) {
 					Cat.logError(e);
-					t.setStatus(e);
 					throw e;
-				} catch (Error e) {
+				} catch (Throwable e) {
+					t.setStatus(e);
 					Cat.logError(e);
-					t.setStatus(e);
-					throw e;
+					throw new RuntimeException(e);
 				} finally {
 					customizeUri(t, req);
 					t.complete();
 				}
 			}
 		};
+	}
+
+	protected static interface Handler {
+		public void handle(Context ctx) throws IOException, ServletException;
 	}
 
 	protected static class Context {
@@ -367,12 +386,24 @@ public class CatFilter implements Filter {
 			return m_id;
 		}
 
+		public void setId(String id) {
+			m_id = id;
+		}
+
 		public int getMode() {
 			return m_mode;
 		}
 
+		public void setMode(int mode) {
+			m_mode = mode;
+		}
+
 		public String getParentId() {
 			return m_parentId;
+		}
+
+		public void setParentId(String parentId) {
+			m_parentId = parentId;
 		}
 
 		public HttpServletRequest getRequest() {
@@ -387,8 +418,16 @@ public class CatFilter implements Filter {
 			return m_rootId;
 		}
 
+		public void setRootId(String rootId) {
+			m_rootId = rootId;
+		}
+
 		public String getType() {
 			return m_type;
+		}
+
+		public void setType(String type) {
+			m_type = type;
 		}
 
 		public void handle() throws IOException, ServletException {
@@ -405,182 +444,9 @@ public class CatFilter implements Filter {
 			return m_top;
 		}
 
-		public void setId(String id) {
-			m_id = id;
-		}
-
-		public void setMode(int mode) {
-			m_mode = mode;
-		}
-
-		public void setParentId(String parentId) {
-			m_parentId = parentId;
-		}
-
-		public void setRootId(String rootId) {
-			m_rootId = rootId;
-		}
-
 		public void setTop(boolean top) {
 			m_top = top;
 		}
-
-		public void setType(String type) {
-			m_type = type;
-		}
 	}
 
-	public static class CookieWrapper extends Cookie {
-		private Cookie m_cookie;
-
-		public CookieWrapper(Cookie cookie) {
-			super(cookie.getName(), cookie.getValue());
-			m_cookie = cookie;
-		}
-
-		public CookieWrapper(String name, String value) {
-			super(name, value);
-		}
-
-		public Object clone() {
-			return m_cookie.clone();
-		}
-
-		public boolean equals(Object obj) {
-			return m_cookie.equals(obj);
-		}
-
-		public String getComment() {
-			return m_cookie.getComment();
-		}
-
-		public String getDomain() {
-			return m_cookie.getDomain();
-		}
-
-		public int getMaxAge() {
-			return m_cookie.getMaxAge();
-		}
-
-		public String getName() {
-			return m_cookie.getName();
-		}
-
-		public String getPath() {
-			return m_cookie.getPath();
-		}
-
-		public boolean getSecure() {
-			return m_cookie.getSecure();
-		}
-
-		public String getValue() {
-			Event event = Cat.newEvent(Cat.getManager().getDomain() + ":ReadCookie", m_cookie.getName());
-
-			event.setStatus(Event.SUCCESS);
-			event.complete();
-			return m_cookie.getValue();
-		}
-
-		public int getVersion() {
-			return m_cookie.getVersion();
-		}
-
-		public int hashCode() {
-			return m_cookie.hashCode();
-		}
-
-		public void setComment(String purpose) {
-			m_cookie.setComment(purpose);
-		}
-
-		public void setDomain(String pattern) {
-			m_cookie.setDomain(pattern);
-		}
-
-		public void setMaxAge(int expiry) {
-			m_cookie.setMaxAge(expiry);
-		}
-
-		public void setPath(String uri) {
-			m_cookie.setPath(uri);
-		}
-
-		public void setSecure(boolean flag) {
-			m_cookie.setSecure(flag);
-		}
-
-		public void setValue(String newValue) {
-			m_cookie.setValue(newValue);
-		}
-
-		public void setVersion(int v) {
-			m_cookie.setVersion(v);
-		}
-
-		public String toString() {
-			return m_cookie.toString();
-		}
-	}
-
-	protected static interface Handler {
-		public void handle(Context ctx) throws IOException, ServletException;
-	}
-
-	public static class RequestWrapper extends HttpServletRequestWrapper {
-
-		private HttpServletRequest m_request;
-
-		public RequestWrapper(HttpServletRequest request) {
-			super(request);
-			m_request = request;
-		}
-
-		@Override
-		public Cookie[] getCookies() {
-			Cookie[] cookies = m_request.getCookies();
-
-			if (cookies != null) {
-				int length = cookies.length;
-				CookieWrapper[] wappers = new CookieWrapper[length];
-
-				for (int i = 0; i < length; i++) {
-					wappers[i] = new CookieWrapper(cookies[i]);
-				}
-				return wappers;
-			} else {
-				return null;
-			}
-		}
-
-	}
-
-	public static class ResponseWrapper extends HttpServletResponseWrapper {
-
-		public ResponseWrapper(HttpServletResponse response) {
-			super(response);
-		}
-
-		@Override
-		public void addCookie(Cookie cookie) {
-			Event event = Cat.newEvent(Cat.getManager().getDomain() + ":SetCookie", cookie.getName());
-
-			event.setStatus(Event.SUCCESS);
-			event.addData("domain", cookie.getDomain());
-			event.addData("path", cookie.getPath());
-			event.addData("maxAge", cookie.getMaxAge());
-			event.complete();
-			super.addCookie(cookie);
-		}
-
-		@Override
-		public void addHeader(String name, String value) {
-			Event event = Cat.newEvent(Cat.getManager().getDomain() + ":SetHead", name);
-
-			event.setStatus(Event.SUCCESS);
-			event.addData("value", value);
-			event.complete();
-			super.addHeader(name, value);
-		}
-	}
 }
